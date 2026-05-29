@@ -1,16 +1,17 @@
 import laspy
-import sys
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
 from scipy.ndimage import uniform_filter
+import rasterio
 
 
-def laz_raster(path_in, path_out, resol, classe):
+
+def laz_raster(laz_name, path_out, resol, classe):
     """
-    Convertit un nuage de points LAZ en raster GeoTIFF (MNS brut).
+    LAZ vers raster GeoTIFF 
     ---------------------------------------------------------------------------------------
-    @param[in]  path_in  : Chemin vers le .laz
+    @param[in]  laz_name : Nom du fichier .laz
     @param[in]  path_out : Chemin du .tif de sortie
     @param[in]  resol    : Taille pixel en m
     @param[in]  classe   : Classe LiDAR à rasteriser (6 = bâtiment)
@@ -18,145 +19,86 @@ def laz_raster(path_in, path_out, resol, classe):
     @param[out] transf   : Transformation affine géographique
     ---------------------------------------------------------------------------------------
     """
-    try:
-        las = laspy.read(path_in)
-    except Exception:
-        print(f"Erreur : Impossible de lire {path_in}")
-        sys.exit(1)
+    las = laspy.read(laz_name)
 
-    x = np.array(las.x[las.classification == classe])
-    y = np.array(las.y[las.classification == classe])
-    z = np.array(las.z[las.classification == classe])
+    mask = las.classification == classe
+    x, y, z = np.array(las.x[mask]), np.array(las.y[mask]), np.array(las.z[mask])
 
-    if len(x) == 0:
-        print(f"Aucun point de classe {classe}")
-        sys.exit(1)
-
-    # Suppression des pics Z aberrants (outliers > 5 MAD au-dessus de la médiane)
-    # On filtre uniquement par le haut : pour un MNS on veut garder les points hauts légitimes
-    # mais pas les erreurs isolées (oiseaux, réflexions parasites, etc.)
+    # supression valeur abérrante
     z_med = np.median(z)
-    mad   = np.median(np.abs(z - z_med)) * 1.4826   # équivalent robuste de l'écart-type
-    mask  = z <= z_med + 5 * mad
-    n_removed = int(np.sum(~mask))
-    if n_removed > 0:
-        print(f"  Points aberrants supprimés : {n_removed:,}")
-        x, y, z = x[mask], y[mask], z[mask]
+    mad   = np.median(np.abs(z - z_med)) * 1.4826
+    ok    = z <= z_med + 5 * mad
+    x, y, z = x[ok], y[ok], z[ok]
 
-    x_min = np.floor(x.min() / resol) * resol
-    x_max = np.ceil(x.max()  / resol) * resol
-    y_min = np.floor(y.min() / resol) * resol
-    y_max = np.ceil(y.max()  / resol) * resol
+    # Grille
+    x_min  = np.floor(x.min() / resol) * resol
+    y_max  = np.ceil(y.max()  / resol) * resol
+    n_cols = int((np.ceil(x.max() / resol) * resol - x_min) / resol)
+    n_rows = int((y_max - np.floor(y.min() / resol) * resol) / resol)
 
-    n_rows = int((y_max - y_min) / resol)
-    n_cols = int((x_max - x_min) / resol)
-    print(f"Grille : {n_cols} colonnes × {n_rows} lignes")
+    col = np.clip(((x - x_min) / resol).astype(int), 0, n_cols - 1)
+    row = np.clip(((y_max - y) / resol).astype(int), 0, n_rows - 1)
 
-    col_idx = np.clip(((x - x_min) / resol).astype(int), 0, n_cols - 1)
-    row_idx = np.clip(((y_max - y) / resol).astype(int), 0, n_rows - 1)
-
-    mns_max = np.full((n_rows, n_cols), -np.inf)
-    np.maximum.at(mns_max, (row_idx, col_idx), z)
-
+    # Z max par pixel
+    mns_max = np.full((n_rows, n_cols), -np.inf, dtype='float32')
+    np.maximum.at(mns_max, (row, col), z)
     mns = np.where(mns_max > -np.inf, mns_max, np.nan).astype('float32')
-    print(f"Pixels remplis : {np.sum(~np.isnan(mns)):,} | vides : {np.sum(np.isnan(mns)):,}")
 
     transf = from_origin(x_min, y_max, resol, resol)
-    _save_tif(mns, path_out, n_rows, n_cols, transf)
+
+    with rasterio.open(path_out, 'w', driver='GTiff',
+                       height=n_rows, width=n_cols, count=1,
+                       dtype='float32', crs='EPSG:2154',
+                       transform=transf, nodata=np.nan) as dst:
+        dst.write(mns, 1)
+
     return mns, transf
 
 
-def mask_vegetation(mns, roughness_threshold=0.8):
+def mask_vegetation(mns, seuil=0.8):
     """
-    Masque les pixels de végétation par rugosité locale (écart-type fenêtre 3x3).
-    Ref : seuil 0.8m — Cheng et al. 2016, Remote Sensing.
+    Met à NaN les pixels de végétation ou autre détécté par rugosité locale.
     ---------------------------------------------------------------------------------------
-    @param[in]  mns                 : MNS NumPy 2D
-    @param[in]  roughness_threshold : Seuil écart-type en m
-    @param[out] mns_cleaned         : MNS filtré
+    @param[in]  mns   : MNS NumPy 2D
+    @param[in]  seuil : Seuil écart-type en m (défaut 0.8)
+    @param[out] out   : MNS filtré (végétation → NaN)
     ---------------------------------------------------------------------------------------
     """
-    nan_mask = np.isnan(mns)
-    # Remplacer NaN par moyenne locale pour ne pas polluer le calcul
-    mns_tmp = np.where(nan_mask, uniform_filter(np.where(nan_mask, 0.0, mns), size=3), mns)
-
-    # std locale = sqrt(E[X²] - E[X]²)
-    std_map = np.sqrt(np.maximum(
-        uniform_filter(mns_tmp**2, size=3) - uniform_filter(mns_tmp, size=3)**2, 0
+    tmp = np.where(np.isnan(mns), 0.0, mns)
+    std = np.sqrt(np.maximum(
+        uniform_filter(tmp**2, size=3) - uniform_filter(tmp, size=3)**2, 0
     ))
-
-    veg_mask = std_map > roughness_threshold
-    print(f"  Pixels végétation masqués : {np.sum(veg_mask & ~nan_mask):,}")
-
-    cleaned = mns.copy()
-    cleaned[veg_mask] = np.nan
-    return cleaned
+    out = mns.copy()
+    out[std > seuil] = np.nan
+    return out
 
 
-def fill_gaps(mns, max_gap=5):
+def fill_gaps(mns, iterations=5):
     """
-    Comble uniquement les trous INTERNES (NaN entourés de pixels valides).
-    Ne déborde pas en dehors des bâtiments.
+    Comble les trous INTERNES du raster (NaN entourés de voisins valides).
+    Chaque itération remplace les NaN ayant ≥4 voisins valides par leur moyenne.
     ---------------------------------------------------------------------------------------
-    @param[in]  mns      : MNS NumPy 2D
-    @param[in]  max_gap  : Nb max d'itérations (1 iter ≈ 1 pixel de rayon)
-    @param[out] mns_filled : MNS avec trous internes comblés
+    @param[in]  mns        : MNS NumPy 2D
+    @param[in]  iterations : Nb max d'itérations
+    @param[out] out        : MNS avec trous internes comblés
     ---------------------------------------------------------------------------------------
-    Principe : à chaque itération, on identifie les NaN internes via binary_erosion
-    du masque des pixels valides — seuls les NaN entourés de voisins valides sont comblés.
     """
-    mns_filled = mns.copy()
+    out = mns.copy()
 
-    for iteration in range(max_gap):
-        nan_mask = np.isnan(mns_filled)
-        if not np.any(nan_mask):
+    for _ in range(iterations):
+        nan_mask = np.isnan(out)
+        if not nan_mask.any():
             break
 
-        # Pixels valides
-        valid_mask = ~nan_mask
-
-        # Éroder le masque valide : ne garde que les pixels valides
-        # dont TOUS les voisins 3x3 sont aussi valides ou NaN interne
-        # Un NaN est "interne" s'il est entouré de pixels valides
-        # On détecte ça en dilatant le masque valide et en cherchant
-        # les NaN qui touchent des pixels valides
-        neighbor_sum   = np.zeros_like(mns_filled)
-        neighbor_count = np.zeros_like(mns_filled)
-        data  = np.where(nan_mask, 0.0, mns_filled)
-        valid = valid_mask.astype(float)
+        data  = np.where(nan_mask, 0.0, out)
+        valid = (~nan_mask).astype(float)
+        s, n  = np.zeros_like(out), np.zeros_like(out)
 
         for dr, dc in [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]:
-            neighbor_sum   += np.roll(np.roll(data,  dr, axis=0), dc, axis=1) * \
-                              np.roll(np.roll(valid, dr, axis=0), dc, axis=1)
-            neighbor_count += np.roll(np.roll(valid, dr, axis=0), dc, axis=1)
+            s += np.roll(np.roll(data,  dr, 0), dc, 1) * np.roll(np.roll(valid, dr, 0), dc, 1)
+            n += np.roll(np.roll(valid, dr, 0), dc, 1)
 
-        # Un NaN est interne s'il a AU MOINS 4 voisins valides sur 8
-        # (évite de combler les bords où il n'y a que 1-2 voisins)
-        internal_nan = nan_mask & (neighbor_count >= 4)
+        internes = nan_mask & (n >= 4)
+        out = np.where(internes, s / np.where(n > 0, n, 1), out)
 
-        if not np.any(internal_nan):
-            break
-
-        with np.errstate(invalid='ignore'):
-            mean_neighbors = np.where(neighbor_count > 0,
-                                      neighbor_sum / neighbor_count, np.nan)
-
-        mns_filled = np.where(internal_nan, mean_neighbors, mns_filled)
-
-        n_filled = np.sum(nan_mask) - np.sum(np.isnan(mns_filled))
-        print(f"  Itération {iteration+1} : {n_filled:,} pixels comblés")
-
-    print(f"  Trous restants : {np.sum(np.isnan(mns_filled)):,} pixels")
-    return mns_filled
-
-
-def _save_tif(mns, path_out, n_rows, n_cols, transf):
-    """Sauvegarde un tableau numpy en GeoTIFF Lambert 93."""
-    with rasterio.open(
-        path_out, 'w', driver='GTiff',
-        height=n_rows, width=n_cols, count=1,
-        dtype='float32', crs='EPSG:2154',
-        transform=transf, nodata=np.nan
-    ) as dst:
-        dst.write(mns.astype('float32'), 1)
-    print(f"  Sauvegardé : {path_out}")
+    return out

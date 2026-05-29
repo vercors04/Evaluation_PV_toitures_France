@@ -1,11 +1,11 @@
 import re
 import geopandas as gpd
 
-def TileBounds(mns_filename):
+def TileBounds(mns_name):
     """
     Extrait l'emprise (bounds) d'une tuile depuis le nom du fichier MNS IGN.
     ---------------------------------------------------------------------------------------
-    @param[in]  mns_filename : Nom du fichier MNS IGN   LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif
+    @param[in]  mns_name : Nom du fichier MNS IGN   LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif
 
     @param[out] tuple        : (x_min, y_min, x_max, y_max) en Lambert 93
     ---------------------------------------------------------------------------------------
@@ -13,9 +13,9 @@ def TileBounds(mns_filename):
     Tuile = 1km x 1km
     """
     #objet match qui recherche des occurences de caractères, fonctionne un peu comme un tableau
-    match = re.search(r'_(\d{4})_(\d{4})_', mns_filename) 
+    match = re.search(r'_(\d{4})_(\d{4})_', mns_name) 
     if not match:
-        raise ValueError(f"Nom de fichier incorrect : {mns_filename}")
+        raise ValueError(f"Nom de fichier incorrect : {mns_name}")
 
     x_km = int(match.group(1))  
     y_km = int(match.group(2))  
@@ -31,38 +31,39 @@ def TileBounds(mns_filename):
     return (x_min, y_min, x_max, y_max)
 
 
-def LoadBuild(gpkg_path, tile_bounds):
+def LoadBuild(gpkg_name, tile_bounds):
     """
     Charge et filtre les bâtiments exploitables depuis la BD TOPO.
     ---------------------------------------------------------------------------------------
-    @param[in]  gpkg_path    : Chemin vers le fichier .gpkg
+    @param[in]  gpkg_name    : Nom du fichier .gpkg
     @param[in]  tile_bounds  : Tuple (x_min, y_min, x_max, y_max) en Lambert 93
                                None = charge tout le département.
     @param[out] gdf          : GeoDataFrame filtré (bâtiments exploitables)
     ---------------------------------------------------------------------------------------
     """
     USAGES_GARDES = [
-        'Résidentiel',
-        'Indifférencié',
-        'Commercial et services',
-        'Industriel',
-        'Religieux'
+    'Indifférenciée',
+    'Industriel, agricole ou commercial',
+    'Eglise',
+    'Chapelle',
+    'Monument',
+    'Château',
     ]
 
     if tile_bounds is not None:
-        gdf = gpd.read_file(gpkg_path, layer='batiment', bbox=tile_bounds) #on lit que le carré qui nous interesse
+        gdf = gpd.read_file(f"data/raw/{gpkg_name}", layer='batiment', bbox=tile_bounds) #on lit que le carré qui nous interesse
     else:
-        gdf = gpd.read_file(gpkg_path, layer='batiment')
+        gdf = gpd.read_file(f"data/raw/{gpkg_name}", layer='batiment')
 
     total = len(gdf)
 
     gdf = gdf[
-        (gdf['usage_1'].isin(USAGES_GARDES)) &
+        (gdf['nature'].isin(USAGES_GARDES)) &
         (gdf['etat_de_l_objet'] == 'En service')
     ].copy()
 
     #on garde que les colonnes utiles
-    gdf = gdf[['cleabs', 'usage_1', 'hauteur', 'nombre_d_etages', 'geometry']]
+    gdf = gdf[['cleabs', 'nature', 'hauteur', 'nombre_d_etages', 'geometry']]
 
     print(f"Bâtiments totaux    : {total:,}")
     print(f"Bâtiments conservés : {len(gdf):,}")
@@ -70,10 +71,3 @@ def LoadBuild(gpkg_path, tile_bounds):
 
     return gdf
 
-
-if __name__ == "__main__":
-    mns_filename = "LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif"
-
-    tile_bounds = TileBounds(mns_filename)
-    gdf = LoadBuild("data/raw/vienne.gpkg", tile_bounds=tile_bounds)
-    print(gdf.head())

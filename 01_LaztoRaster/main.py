@@ -1,22 +1,15 @@
 import os
 import sys
-
-_HERE    = os.path.dirname(os.path.abspath(__file__))
-_OUT_DIR = os.path.join(_HERE, '..', 'data', 'processed')
-
-sys.path.insert(0, _HERE)
-from LAZtoRaster import laz_raster, mask_vegetation, fill_gaps, _save_tif
-
+from LAZtoRaster import *
+LAZ_NAME ="LHD_FXX_0475_6594_PTS_LAMB93_IGN69.copc.laz"
 
 def main():
-    laz_path = input("Chemin vers le fichier LAZ : ").strip()
-    if not os.path.exists(laz_path):
-        print(f"Erreur : fichier introuvable → {laz_path}")
+    if not os.path.exists(f"data/raw/{LAZ_NAME}"):
+        print(f"Erreur : fichier introuvable → {LAZ_NAME}")
         sys.exit(1)
 
-    base    = os.path.splitext(os.path.basename(laz_path))[0]
-    out_dir = os.path.normpath(_OUT_DIR)
-    os.makedirs(out_dir, exist_ok=True)
+    base    = os.path.splitext(os.path.basename(f"data/raw/{LAZ_NAME}"))[0]
+    out_dir = os.path.normpath("data/processed/")
 
     print("\nQue voulez-vous générer ?")
     print("  1 — MNS brut")
@@ -25,25 +18,21 @@ def main():
 
     if choix == '1':
         path_out = os.path.join(out_dir, f"{base}_brut.tif")
-        print(f"\n=== Rasterisation ===")
-        laz_raster(laz_path, path_out, resol=0.5, classe=6)
+        laz_raster(f"data/raw/{LAZ_NAME}", path_out, resol=0.5, classe=6)
 
     elif choix == '2':
         path_out = os.path.join(out_dir, f"{base}_nettoye.tif")
-        tmp_path = os.path.join(out_dir, f"{base}_tmp.tif")
 
-        print("\n=== Rasterisation ===")
-        mns_brut, transf = laz_raster(laz_path, tmp_path, resol=0.5, classe=6)
-
-        print("\n=== Masquage végétation ===")
+        mns_brut, transf = laz_raster(f"data/raw/{LAZ_NAME}", path_out, resol=0.5, classe=6)
         mns_clean = mask_vegetation(mns_brut)
-
-        print("\n=== Remplissage trous internes ===")
         mns_final = fill_gaps(mns_clean)
 
-        print(f"\n=== Export MNS nettoyé ===")
-        _save_tif(mns_final, path_out, mns_final.shape[0], mns_final.shape[1], transf)
-        os.remove(tmp_path)
+        with rasterio.open(path_out, 'w', driver='GTiff',
+                   height=mns_final.shape[0], width=mns_final.shape[1], count=1,
+                   dtype='float32', crs='EPSG:2154',
+                   transform=transf, nodata=np.nan) as dst:
+            dst.write(mns_final, 1)
+    
 
     else:
         print("Choix invalide.")
