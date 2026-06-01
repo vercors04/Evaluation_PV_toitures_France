@@ -68,14 +68,15 @@ def _analyser_pans(buildings):
 
 
 def main():
-    #MNS_NAME  = "LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif"#INRAE
-    MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
-
-    #MNS_PATH  = f"data/raw/INRAE/{MNS_NAME}" #INRAE
-    MNS_PATH  = f"data/raw/DIDIER/{MNS_NAME}" #DIDIER
-
-    #OUT_DIR = os.path.normpath("data/processed/INRAE") #INRAE
-    OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
+    
+    # MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
+    # MNS_PATH  = f"data/raw/DIDIER/{MNS_NAME}" #DIDIER
+    # OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
+    
+    MNS_NAME  = "LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif"#INRAE
+    MNS_PATH  = f"data/raw/INRAE/{MNS_NAME}" #INRAE
+    OUT_DIR = os.path.normpath("data/processed/INRAE") #INRAE
+    
     
     GPKG_FILE = "BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
     GPKG_PATH = f"data/raw/{GPKG_FILE}"
