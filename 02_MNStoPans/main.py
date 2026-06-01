@@ -68,23 +68,31 @@ def _analyser_pans(buildings):
 
 
 def main():
-    MNS_NAME  = "LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif"
-    GPKG_FILE = "BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
+    #MNS_NAME  = "LHD_FXX_0475_6594_MNS_O_0M50_LAMB93_IGN69.tif"#INRAE
+    MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
 
-    if not os.path.exists(f"data/raw/{MNS_NAME}"):
+    #MNS_PATH  = f"data/raw/INRAE/{MNS_NAME}" #INRAE
+    MNS_PATH  = f"data/raw/DIDIER/{MNS_NAME}" #DIDIER
+
+    #OUT_DIR = os.path.normpath("data/processed/INRAE") #INRAE
+    OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
+    
+    GPKG_FILE = "BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
+    GPKG_PATH = f"data/raw/{GPKG_FILE}"
+
+    if not os.path.exists(MNS_PATH):
         print(f"Erreur : fichier introuvable → {MNS_NAME}")
         sys.exit(1)
 
     base_name         = os.path.splitext(MNS_NAME)[0]
-    out_dir      = os.path.normpath("data/processed/")
-    raster_out = os.path.join(out_dir, f"{base_name}_batiments.tif")
+    raster_out = os.path.join(OUT_DIR, f"{base_name}_batiments.tif")
 
 
     tile_bounds = TileBounds(MNS_NAME)
-    gdf         = LoadBuild(GPKG_FILE, tile_bounds)
-    buildings   = clipMNS(MNS_NAME, gdf)
+    gdf         = LoadBuild(GPKG_PATH, tile_bounds)
+    buildings   = clipMNS(MNS_PATH, gdf)
 
-    sauv_raster(f"data/raw/{MNS_NAME}", buildings, raster_out)
+    sauv_raster(MNS_PATH, buildings, raster_out)
 
     print("\n=== Analyse RANSAC — tuile entière ===")
     df = _analyser_pans(buildings)

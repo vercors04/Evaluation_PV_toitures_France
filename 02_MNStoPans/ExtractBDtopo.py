@@ -31,39 +31,45 @@ def TileBounds(mns_name):
     return (x_min, y_min, x_max, y_max)
 
 
-def LoadBuild(gpkg_name, tile_bounds):
+def LoadBuild(gpkg_path, tile_bounds):
     """
     Charge et filtre les bâtiments exploitables depuis la BD TOPO.
     ---------------------------------------------------------------------------------------
-    @param[in]  gpkg_name    : Nom du fichier .gpkg
+    @param[in]  gpkg_path    : Chemin vers le fichier .gpkg
     @param[in]  tile_bounds  : Tuple (x_min, y_min, x_max, y_max) en Lambert 93
                                None = charge tout le département.
     @param[out] gdf          : GeoDataFrame filtré (bâtiments exploitables)
     ---------------------------------------------------------------------------------------
     """
-    USAGES_GARDES = [
-    'Indifférenciée',
-    'Industriel, agricole ou commercial',
-    'Eglise',
-    'Chapelle',
-    'Monument',
-    'Château',
-    ]
+    # USAGES_GARDES = [
+    # 'Indifférenciée',
+    # 'Industriel, agricole ou commercial',
+    # 'Eglise',
+    # 'Chapelle',
+    # 'Monument',
+    # 'Château',
+    # ]
+
+    # gdf = gdf[
+    #     (gdf['nature'].isin(USAGES_GARDES)) &
+    #     (gdf['etat_de_l_objet'] == 'En service')
+    # ].copy()
 
     if tile_bounds is not None:
-        gdf = gpd.read_file(f"data/raw/{gpkg_name}", layer='batiment', bbox=tile_bounds) #on lit que le carré qui nous interesse
+        gdf = gpd.read_file(gpkg_path, layer='batiment', bbox=tile_bounds) #on lit que le carré qui nous interesse
     else:
-        gdf = gpd.read_file(f"data/raw/{gpkg_name}", layer='batiment')
+        gdf = gpd.read_file(gpkg_path, layer='batiment')
 
     total = len(gdf)
 
     gdf = gdf[
-        (gdf['nature'].isin(USAGES_GARDES)) &
-        (gdf['etat_de_l_objet'] == 'En service')
+        (gdf['etat_de_l_objet'] == 'En service') &
+        (gdf['construction_legere'] == False)
     ].copy()
 
     #on garde que les colonnes utiles
-    gdf = gdf[['cleabs', 'nature', 'hauteur', 'nombre_d_etages', 'geometry']]
+    gdf = gdf[['cleabs', 'nature', 'usage_1', 'hauteur',
+               'nombre_d_etages', 'geometry']].copy()
 
     print(f"Bâtiments totaux    : {total:,}")
     print(f"Bâtiments conservés : {len(gdf):,}")

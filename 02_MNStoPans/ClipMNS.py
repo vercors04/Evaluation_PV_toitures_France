@@ -6,11 +6,11 @@ import re
 from ExtractBDtopo import *
 
 
-def clipMNS(mns_name, gdf):
+def clipMNS(mns_path, gdf):
     """
     Découpe le MNS IGN par l'emprise de chaque bâtiment avec BD topo bati.
     ---------------------------------------------------------------------------------------
-    @param[in]  mns_name : Nom du fichier MNS IGN
+    @param[in]  mns_path : Chemin vers le fichier MNS IGN
     @param[in]  gdf      : BD TOPO filtrée
 
     @param[out] buildings : Liste de dicts, un par bâtiment :
@@ -26,7 +26,7 @@ def clipMNS(mns_name, gdf):
     buildings = [] #liste contenant un dictionnaire pour chaque batiment
                    #chaque dictionnaire contient les infos du batiment (usage, hauteur, ...)
 
-    with rasterio.open(f"data/raw/{mns_name}") as src:
+    with rasterio.open(mns_path) as src:
         for _, row in gdf.iterrows(): #pour tout les batiments dans le BDTopo bat
             try:
 
