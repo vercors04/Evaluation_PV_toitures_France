@@ -13,6 +13,8 @@ LAZ_NAME ="LHD_FXX_0495_6611_PTS_LAMB93_IGN69.copc.laz"#DIDIER
 LAZ_PATH = f"data/raw/DIDIER/{LAZ_NAME}" #DIDIER
 OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
 
+GPKG_PATH = "data/raw/BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
+
 def main():
     if not os.path.exists(LAZ_PATH):
         print(f"Erreur : fichier introuvable → {LAZ_NAME}")
@@ -30,7 +32,9 @@ def main():
     
     pans = ransac_tot(nuages)
 
-
+    print(f"Pans détectés : {len(pans)}")
+    print(f"nombre de batiments {len(nuages)}")
+    print("fichier gpk batiments + pans ok et fichier LAZ batiments ok")
 
     path_pans = os.path.join(OUT_DIR, f"{base}_pans.gpkg")
     sauv_pans_gpkg(pans, path_pans)

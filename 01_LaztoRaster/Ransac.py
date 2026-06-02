@@ -1,9 +1,6 @@
 import numpy as np
 import open3d as o3d
 
-def DownSample(pts, voxel_size=0.25):
-    p = NumpyToPCD(pts).voxel_down_sample(voxel_size=voxel_size)
-    return PCDToNumpy(p)
 
 def ransac_1bat(xyz, seuil=0.1, min_ratio=0.2, n_iter=1000,
                     pente_max=70.0, min_pts_pan=100):
@@ -19,9 +16,6 @@ def ransac_1bat(xyz, seuil=0.1, min_ratio=0.2, n_iter=1000,
     @param[out] pans        : liste de dicts {points, pente, azimut, normale}
     """
     xyz = RemoveNoiseStatistical(xyz, nb_neighbors=20, std_ratio=2.0)
-
-
-    xyz = DownSample(xyz, voxel_size=0.25)
 
     pans_brut = DetectMultiPlanes(xyz, min_ratio=min_ratio,
                                   threshold=seuil, iterations=n_iter)

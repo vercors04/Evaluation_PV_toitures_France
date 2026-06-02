@@ -1,4 +1,5 @@
 #==============VISUALISATION=================
+import pyproj
 import geopandas as gpd
 import pandas as pd
 import laspy
@@ -25,10 +26,9 @@ def sauv_pans_gpkg(tous_pans, path_out, crs=2154):
 
     gdf = gpd.GeoDataFrame(lignes, crs=crs)
     gdf.to_file(path_out, driver="GPKG")
-    print(f"Pans écrits : {path_out} ({len(gdf)} pans)")
 
 def sauv_laz(nuages, path_out):
-    os.makedirs(os.path.dirname(path_out), exist_ok=True)
+    import pyproj
 
     xyz_all = np.vstack(nuages)
     ids = np.concatenate([
@@ -36,8 +36,16 @@ def sauv_laz(nuages, path_out):
         for i, pts in enumerate(nuages)
     ])
 
-    header = laspy.LasHeader(point_format=0, version="1.4")
+    header = laspy.LasHeader(point_format=0, version="1.2")
+    header.offsets = np.array([
+        xyz_all[:,0].min(),
+        xyz_all[:,1].min(),
+        xyz_all[:,2].min()
+    ])
+    header.scales = np.array([0.001, 0.001, 0.001])
+    header.add_crs(pyproj.CRS.from_epsg(2154))
     header.add_extra_dim(laspy.ExtraBytesParams(name="bat_id", type=np.int32))
+
     las = laspy.LasData(header=header)
     las.x = xyz_all[:, 0]
     las.y = xyz_all[:, 1]
@@ -69,9 +77,5 @@ def sauv_gpkg(nuages, path_out, crs=2154):
     geometry = gpd.points_from_xy(df["x"], df["y"])
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs=crs)
     gdf.to_file(path_out, driver="GPKG")
-    print(f"GPKG écrit : {path_out} ({len(gdf)} points, {len(nuages)} bâtiments)")
-
-
-
 
 
