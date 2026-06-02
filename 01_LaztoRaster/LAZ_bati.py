@@ -1,10 +1,9 @@
 import laspy
 import numpy as np
-import os
 import open3d as o3d
 
 
-def laz_bati(laz_path, min_cluster=20, eps=1.0, min_pts=30, classe=6):
+def laz_bati(laz_path, min_cluster=20, eps=0.5, min_pts=30, classe=6):
     """r
     Extrait les batiments d'un .laz 
     ---------------------------------------------------------------------------------------
@@ -30,11 +29,12 @@ def laz_bati(laz_path, min_cluster=20, eps=1.0, min_pts=30, classe=6):
     
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(xyz)
-    labels = np.array(pcd.cluster_dbscan(eps=eps, min_points=min_cluster))
+    num = np.array(pcd.cluster_dbscan(eps=eps, min_points=min_cluster)) #donne un num a chaque point selon le cluster auquel il appartient, -1 si bruit
 
     nuages = []
-    for lab in np.unique(labels[labels >= 0]):
-        pts = xyz[labels == lab]
+    # regroupe les pts par clust
+    for n in np.unique(num[num >= 0]):
+        pts = xyz[num == n]
         if len(pts) >= min_pts:
             nuages.append(pts)
 
@@ -42,32 +42,5 @@ def laz_bati(laz_path, min_cluster=20, eps=1.0, min_pts=30, classe=6):
 
     return nuages
 
-
-
-#==============VISUALISATION=================
-
-
-def sauv_laz(nuages, path_out):
-    """
-    Sauvegarde tous les nuages en un seul .laz.
-    ----------------------------------------------------------
-    @param[in]  nuages    : Liste d'arrays Nx3
-    @param[in]  path_out  : Chemin complet du fichier de sortie (.laz)
-    """
-    xyz_all = np.vstack(nuages)
-    ids = np.concatenate([
-        np.full(len(xyz), i, dtype=np.int32)
-        for i, xyz in enumerate(nuages)
-    ])
-
-    header = laspy.LasHeader(point_format=0, version="1.4")
-    header.add_extra_dim(laspy.ExtraBytesParams(name="bat_id", type=np.int32))
-    las = laspy.LasData(header=header)
-    las.x = xyz_all[:, 0]
-    las.y = xyz_all[:, 1]
-    las.z = xyz_all[:, 2]
-    las.bat_id = ids
-
-    las.write(path_out)
 
 
