@@ -70,10 +70,12 @@ def LoadBuild(gpkg_path, tile_bounds):
     #on garde que les colonnes utiles
     gdf = gdf[['cleabs', 'nature', 'usage_1', 'hauteur',
                'nombre_d_etages', 'geometry']].copy()
-
-    print(f"Bâtiments totaux    : {total:,}")
+    
+    print ("====extraction brut bdtopo====")
+    print(f"Bâtiments totaux de la tuile : {total:,}")
     print(f"Bâtiments conservés : {len(gdf):,}")
     print(f"Bâtiments exclus    : {total - len(gdf):,}")
-
+    print("=================================")
+    
     return gdf
 

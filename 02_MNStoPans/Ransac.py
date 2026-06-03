@@ -1,79 +1,59 @@
 import numpy as np
 import open3d as o3d
-from ClipMNS import *
-from ExtractBDtopo import *
 
 
-# fonctions inspirees du depot github https://github.com/yuecideng/Multiple_Planes_Detection
-
-
-def NumpyToPCD(xyz):
+def ransac_1bat(xyz, seuil=0.1, min_ratio=0.2, n_iter=1000,
+                    pente_max=70.0, min_pts_pan=100):
     """
-    Convertit un array numpy en PointCloud open3d.
-    Ref : yuecideng/Multiple_Planes_Detection — NumpyToPCD()
+    Détecte les pans de toiture d'un bâtiment par RANSAC séquentiel.
+    ---------------------------------------------------------------
+    @param[in]  xyz         : array Nx3 points du bâtiment
+    @param[in]  seuil       : distance max au plan RANSAC (m)
+    @param[in]  min_ratio   : ratio min de points restants pour continuer
+    @param[in]  n_iter      : nb itérations RANSAC
+    @param[in]  pente_max   : seuil rejet façades (degrés)
+    @param[in]  min_pts_pan : nb min de points pour garder un pan
+    @param[out] pans        : liste de dicts {points, pente, azimut, normale}
     """
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(xyz)
-    return pcd
+    xyz = RemoveNoiseStatistical(xyz, nb_neighbors=20, std_ratio=2.0)
+
+    pans_brut = DetectMultiPlanes(xyz, min_ratio=min_ratio,
+                                  threshold=seuil, iterations=n_iter)
+    pans = []
+    for equation, pts_pan in pans_brut:
+        if len(pts_pan) < min_pts_pan:
+            continue
+
+        a, b, c, d = equation
+        n = np.array([a, b, c])
+        n = n / np.linalg.norm(n)
+        if n[2] < 0:
+            n = -n
+
+        pente  = np.degrees(np.arccos(np.clip(n[2], -1, 1)))
+        azimut = np.degrees(np.arctan2(n[0], n[1])) % 360
+
+        if pente > pente_max:   # façade → rejetée
+            continue
+
+        pans.append({
+            "points": pts_pan,
+            "pente":  round(pente, 1),
+            "azimut": round(azimut, 1),
+            "normale": n,
+        })
+    return pans
 
 
-def RemoveNoise(points, nb_neighbors=20, std_ratio=2.0):
-    """
-    Supprime les points aberrants par filtre statistique.
-    Ref : yuecideng/Multiple_Planes_Detection — RemoveNoiseStatistical()
-    """
-    pcd = NumpyToPCD(points)
-    cl, _ = pcd.remove_statistical_outlier(
-        nb_neighbors=nb_neighbors, std_ratio=std_ratio)
-    return np.asarray(cl.points)
+def ransac_tot(nuages):
+    pans = []                          
+    for i, xyz in enumerate(nuages):
+        pan1 = ransac_1bat(xyz)       
+        for pan in pan1:
+            pan["bat_id"] = i
+        pans.extend(pan1)
+    return pans
 
-
-def PlaneRegression(points, threshold=0.15, init_n=3, iterations=1000):
-    """
-    RANSAC pour détecter le plan dominant dans un nuage de points.
-    Ref : yuecideng/Multiple_Planes_Detection — PlaneRegression()
-    ---------------------------------------------------------------------------------------
-    @param[in]  points     : N x3 point clouds
-    @param[in]  threshold  : distance threshold.
-    @param[in]  init_n     : Number of initial points to be considered inliers in each iteration
-    @param[in]  iterations : number of iteration.
-
-    @param[out] w          : Equation du plan (a,b,c,d) tq ax+by+cz+d=0
-    @param[out] index      : Indices des inliers
-    ---------------------------------------------------------------------------------------
-    """
-    pcd = NumpyToPCD(points)
-    w, index = pcd.segment_plane(threshold, init_n, iterations)
-    return w, index
-
-
-def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.15, iterations=1000):
-    """
-    Détecte plusieurs plans séquentiellement (RANSAC itératif).
-    Ref : yuecideng/Multiple_Planes_Detection — DetectMultiPlanes()
-    ---------------------------------------------------------------------------------------
-    @param[in]  points     : Array (N,3) nuage de points du bâtiment
-    @param[in]  min_ratio  : The minimum left points ratio to end the Detection.
-    @param[in]  threshold  : RANSAC threshold in (m).
-    @param[in]  iterations : Nb d'itérations par plan
-
-    @param[out] plane_list : Plane equation and plane point index
-    ---------------------------------------------------------------------------------------
-    """
-    plane_list = []
-    N = len(points)
-    remaining = points.copy()
-    count = 0
-
-    while count < (1 - min_ratio) * N:
-        if len(remaining) < 10:
-            break
-        w, index = PlaneRegression(remaining, threshold, iterations=iterations)
-        count += len(index)
-        plane_list.append((w, remaining[index]))
-        remaining = np.delete(remaining, index, axis=0)
-
-    return plane_list
 
 
 def MNSToPointCloud(mns, transf):
@@ -90,37 +70,113 @@ def MNSToPointCloud(mns, transf):
     return np.column_stack([x, y, z])
 
 
-def PlaneToAngles(w):
+#===========================================================================================
+# fonctions prise du depot github https://github.com/yuecideng/Multiple_Planes_Detection
+#===========================================================================================
+
+def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
+    """ Detect multiple planes from given point clouds
+
+    Args:
+        points (np.ndarray): 
+        min_ratio (float, optional): The minimum left points ratio to end the Detection. Defaults to 0.05.
+        threshold (float, optional): RANSAC threshold in (m). Defaults to 0.01.
+
+    Returns:
+        [List[tuple(np.ndarray, List)]]: Plane equation and plane point index
     """
-    Calcule pente et azimut depuis l'équation du plan ax+by+cz+d=0.
-    ---------------------------------------------------------------------------------------
-    @param[in]  w      : tuple (a,b,c,d)
-    @param[out] pente  : inclinaison en degrés (0°=plat, 90°=vertical)
-    @param[out] azimut : orientation en degrés (0°=Nord, 90°=Est, 180°=Sud, 270°=Ouest)
-    ---------------------------------------------------------------------------------------
+
+    plane_list = []
+    N = len(points)
+    target = points.copy()
+    count = 0
+
+    while count < (1 - min_ratio) * N:
+        w, index = PlaneRegression(
+            target, threshold=threshold, init_n=3, iter=iterations)
+    
+        count += len(index)
+        plane_list.append((w, target[index]))
+        target = np.delete(target, index, axis=0)
+
+    return plane_list
+
+
+
+
+
+def NumpyToPCD(xyz):
+    """ convert numpy ndarray to open3D point cloud 
+
+    Args:
+        xyz (ndarray): 
+
+    Returns:
+        [open3d.geometry.PointCloud]: 
     """
-    a, b, c, _ = w
-    normal = np.array([a, b, c])
-    normal = normal / np.linalg.norm(normal)
 
-    if normal[2] < 0:
-        normal = -normal
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(xyz)
 
-    pente  = np.degrees(np.arccos(np.clip(normal[2], -1, 1)))
-    azimut = np.degrees(np.arctan2(normal[0], normal[1])) % 360
-
-    return round(pente, 1), round(azimut, 1)
+    return pcd
 
 
+def PCDToNumpy(pcd):
+    """  convert open3D point cloud to numpy ndarray
 
-def AzimutToOrientation(az):
-    if az <= 22.5 or az > 337.5:   return 'Nord'
-    elif az <= 67.5:                return 'Nord-Est'
-    elif az <= 112.5:               return 'Est'
-    elif az <= 157.5:               return 'Sud-Est'
-    elif az <= 202.5:               return 'Sud'
-    elif az <= 247.5:               return 'Sud-Ouest'
-    elif az <= 292.5:               return 'Ouest'
-    else:                           return 'Nord-Ouest'
+    Args:
+        pcd (open3d.geometry.PointCloud): 
+
+    Returns:
+        [ndarray]: 
+    """
+
+    return np.asarray(pcd.points)
+
+
+
+
+def RemoveNoiseStatistical(pc, nb_neighbors=20, std_ratio=2.0):
+    """ remove point clouds noise using statitical noise removal method
+
+    Args:
+        pc (ndarray): N x 3 point clouds
+        nb_neighbors (int, optional): Defaults to 20.
+        std_ratio (float, optional): Defaults to 2.0.
+
+    Returns:
+        [ndarray]: N x 3 point clouds
+    """
+
+    pcd = NumpyToPCD(pc)
+    cl, ind = pcd.remove_statistical_outlier(
+        nb_neighbors=nb_neighbors, std_ratio=std_ratio)
+
+    return PCDToNumpy(cl)
+
+
+
+
+def PlaneRegression(points, threshold=0.01, init_n=3, iter=1000):
+    """ plane regression using ransac
+
+    Args:
+        points (ndarray): N x3 point clouds
+        threshold (float, optional): distance threshold. Defaults to 0.003.
+        init_n (int, optional): Number of initial points to be considered inliers in each iteration
+        iter (int, optional): number of iteration. Defaults to 1000.
+
+    Returns:
+        [ndarray, List]: 4 x 1 plane equation weights, List of plane point index
+    """
+
+    pcd = NumpyToPCD(points)
+
+    w, index = pcd.segment_plane(
+        threshold, init_n, iter)
+
+    return w, index
+
+
 
 

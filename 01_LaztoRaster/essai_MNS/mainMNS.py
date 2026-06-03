@@ -1,13 +1,13 @@
 import os
 import sys
 from LAZtoRaster import *
-LAZ_NAME ="LHD_FXX_0475_6594_PTS_LAMB93_IGN69.copc.laz"#INRAE
-LAZ_PATH = f"data/raw/INRAE/{LAZ_NAME}" #INRAE
-OUT_DIR = os.path.normpath("data/processed/INRAE") #INRAE
+# LAZ_NAME ="LHD_FXX_0475_6594_PTS_LAMB93_IGN69.copc.laz"#INRAE
+# LAZ_PATH = f"data/raw/INRAE/{LAZ_NAME}" #INRAE
+# OUT_DIR = os.path.normpath("data/processed/INRAE") #INRAE
 
-# LAZ_NAME ="LHD_FXX_0495_6611_PTS_LAMB93_IGN69.copc.laz"#DIDIER
-# LAZ_PATH = f"data/raw/DIDIER/{LAZ_NAME}" #DIDIER
-# OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
+LAZ_NAME ="LHD_FXX_0495_6611_PTS_LAMB93_IGN69.copc.laz"#DIDIER
+LAZ_PATH = f"data/raw/DIDIER/{LAZ_NAME}" #DIDIER
+OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
 
 def main():
     if not os.path.exists(LAZ_PATH):

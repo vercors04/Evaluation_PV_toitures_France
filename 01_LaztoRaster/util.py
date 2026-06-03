@@ -1,14 +1,14 @@
 #==============VISUALISATION=================
-import pyproj
 import geopandas as gpd
 import pandas as pd
 import laspy
 import numpy as np
 import os
+import geopandas as gpd
+from shapely.geometry import MultiPoint
 
 def sauv_pans_gpkg(tous_pans, path_out, crs=2154):
-    import geopandas as gpd
-    from shapely.geometry import MultiPoint
+
 
     lignes = []
     for pan in tous_pans:
@@ -56,7 +56,7 @@ def sauv_laz(nuages, path_out):
     print(f"LAZ écrit : {path_out} ({len(xyz_all)} points, {len(nuages)} bâtiments)")
 
 
-def sauv_gpkg(nuages, path_out, crs=2154):
+def sauv_isolBat_gpkg(nuages, path_out, crs=2154):
 
 
     os.makedirs(os.path.dirname(path_out), exist_ok=True)

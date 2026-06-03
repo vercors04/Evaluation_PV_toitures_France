@@ -1,0 +1,1 @@
+#ombrage avec les données LiDAR seulement

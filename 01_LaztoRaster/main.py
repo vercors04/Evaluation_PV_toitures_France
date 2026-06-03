@@ -2,7 +2,8 @@ import os
 import sys
 from LAZ_bati import *
 from Ransac import *
-from crea_fic import *
+from util import *
+from region_g import *
 
 
 # LAZ_NAME ="LHD_FXX_0475_6594_PTS_LAMB93_IGN69.copc.laz"#INRAE
@@ -21,23 +22,39 @@ def main():
         sys.exit(1)
 
     base    = LAZ_NAME.replace(".copc.laz", "")
-    nuages = laz_bati(LAZ_PATH, min_cluster=20, eps=0.9, min_pts=60, classe=6)
+    nuages = laz_bati(LAZ_PATH, min_cluster=20, eps=0.9, min_pts=50, classe=6)
 
 
     path_gpkg = os.path.join(OUT_DIR, f"{base}_clust.gpkg")
     path_laz = os.path.join(OUT_DIR, f"{base}_clust.laz")
 
-    sauv_gpkg(nuages, path_gpkg)
+    sauv_isolBat_gpkg(nuages, path_gpkg)
     sauv_laz(nuages, path_laz)
     
-    pans = ransac_tot(nuages)
+    
 
-    print(f"Pans détectés : {len(pans)}")
+
+    #PANS ransac
+    pans_r = ransac_tot(nuages)
+    path_pans = os.path.join(OUT_DIR, f"{base}_LAZpans_ransac.gpkg")
+    sauv_pans_gpkg(pans_r, path_pans)
+
+    print("=====RANSAC=====")
+    print(f"Pans détectés : {len(pans_r)}")
     print(f"nombre de batiments {len(nuages)}")
     print("fichier gpk batiments + pans ok et fichier LAZ batiments ok")
 
-    path_pans = os.path.join(OUT_DIR, f"{base}_pans.gpkg")
-    sauv_pans_gpkg(pans, path_pans)
+
+
+    #pans region growing
+    # pans_g = rg_tot(nuages)
+    # path_pans = os.path.join(OUT_DIR, f"{base}_LAZpans_region_growing.gpkg")
+    # sauv_pans_gpkg(pans_g, path_pans)
+
+    # print("=====REGION GROWING=====")
+    # print(f"Pans détectés : {len(pans_g)}")
+    # print(f"nombre de batiments {len(nuages)}")
+    # print("fichier gpk batiments + pans ok et fichier LAZ batiments ok")
 
 if __name__ == "__main__":
     main()
