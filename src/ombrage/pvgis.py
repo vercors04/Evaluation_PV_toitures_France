@@ -30,7 +30,7 @@ def pvgisTousPans(pans, mns_path, crs_source=2154):
         cx, cy      = pts[:, 0].mean(), pts[:, 1].mean()
         z_pan       = pts[:, 2].mean()
         surf_reelle = MultiPoint(pts[:, :2]).convex_hull.area \
-                      / (np.cos(np.radians(pan["pente"])) or 1)
+                      / np.cos(np.radians(pan["pente"]))
         lon, lat    = transformer.transform(cx, cy)
 
         # horizon 36 directions
@@ -55,31 +55,25 @@ def pvgisTousPans(pans, mns_path, crs_source=2154):
         if asp > 180:  asp -= 360
         if asp < -180: asp += 360
 
-        try:
-            r = requests.get(
-                "https://re.jrc.ec.europa.eu/api/v5_3/PVcalc",
-                params={
-                    "lat": round(lat, 5), "lon": round(lon, 5),
-                    "peakpower": 1.0, "loss": 14,
-                    "angle": round(pan["pente"], 1), "aspect": asp,
-                    "outputformat": "json", "raddatabase": "PVGIS-SARAH3",
-                    "mountingplace": "building",
-                    "userhorizon": ",".join(f"{h:.2f}" for h in horizon),
-                },
-                timeout=10
-            )
-            r.raise_for_status()
-            d   = r.json()["outputs"]["totals"]["fixed"]
-            kwc = surf_reelle * 0.20
-            pan["surf_m2"]            = round(surf_reelle, 1)
-            pan["puissance_kwc"]      = round(kwc, 2)
-            pan["irradiation_kwh_m2"] = d["H(i)_y"]
-            pan["production_kwh_an"]  = round(d["E_y"] * kwc, 0)
-        except Exception:
-            pan["surf_m2"]            = round(surf_reelle, 1)
-            pan["puissance_kwc"]      = round(surf_reelle * 0.20, 2)
-            pan["irradiation_kwh_m2"] = None
-            pan["production_kwh_an"]  = None
+        r = requests.get(
+            "https://re.jrc.ec.europa.eu/api/v5_3/PVcalc",
+            params={
+                "lat": round(lat, 5), "lon": round(lon, 5),
+                "peakpower": 1.0, "loss": 14,
+                "angle": round(pan["pente"], 1), "aspect": asp,
+                "outputformat": "json", "raddatabase": "PVGIS-SARAH3",
+                "mountingplace": "building",
+                "userhorizon": ",".join(f"{h:.2f}" for h in horizon),
+            },
+            timeout=10
+        )
+        r.raise_for_status()
+        d   = r.json()["outputs"]["totals"]["fixed"]
+        kwc = surf_reelle * 0.20
+        pan["surf_m2"]            = round(surf_reelle, 1)
+        pan["puissance_kwc"]      = round(kwc, 2)
+        pan["irradiation_kwh_m2"] = d["H(i)_y"]
+        pan["production_kwh_an"]  = round(d["E_y"] * kwc, 0)
 
         if i % 50 == 0:
             print(f"  {i}/{len(pans)} pans traités...")

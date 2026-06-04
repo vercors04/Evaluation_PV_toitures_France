@@ -30,7 +30,7 @@ def main():
         sys.exit(1)
 
     base    = LAZ_NAME.replace(".copc.laz", "")
-    nuages = clipLAZ(LAZ_PATH, min_cluster=20, eps=0.9, min_pts=50, classe=6)
+    nuages = clipLAZ(LAZ_PATH, eps=0.9, min_pts=20, min_cluster=50, classe=6)
 
 
     path_gpkg = os.path.join(OUT_DIR, f"{base}_clust.gpkg")
@@ -59,7 +59,6 @@ def main():
     sauvPansGPKG(pans_pvg, path_pans_pvg)
 
 
-    import numpy as np
 
     # STATS
     pentes  = [p["pente"]  for p in pans_pvg]
