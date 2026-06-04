@@ -1,76 +1,89 @@
-#premiere version pour valider les ordres de gradeurs
 import requests
+import numpy as np
+import rasterio
 from pyproj import Transformer
+from shapely.geometry import MultiPoint
 
-def pvgisPan(lat, lon, pente, azimut,
-              puissance_kwc=1.0, pertes=14, an=2020):
+
+def pvgisTousPans(pans, mns_path, crs_source=2154):
     """
-    Calcule le productible annuel d'un pan via l'API PVGIS.
+    Calcule le productible PVGIS pour tous les pans avec masque horizon MNS.
     ---------------------------------------------------------------
-    @param[in]  lat        : latitude du pan (degrés décimaux)
-    @param[in]  lon        : longitude du pan (degrés décimaux)
-    @param[in]  pente      : inclinaison du pan (degrés, 0=plat)
-    @param[in]  azimut     : orientation IGN (0=N,90=E,180=S,270=O)
-                             converti en convention PVGIS (0=S,-90=E,90=O)
-    @param[in]  puissance_kwc : puissance crête installée (kWc)
-    @param[in]  pertes     : pertes système en % (câbles, onduleur...)
-    @param[in]  an         : année de référence météo
-    @param[out] dict       : {irradiation_kwh_m2, production_kwh, ok}
-    ---------------------------------------------------------------
-    """
-    # convention d'azimut diff avec pvgis
-    azimut_pvgis = azimut - 180
-    if azimut_pvgis > 180:
-        azimut_pvgis -= 360
-
-    url = "https://re.jrc.ec.europa.eu/api/v5_3/PVcalc"
-    params = {
-        "lat":        lat,
-        "lon":        lon,
-        "peakpower":  puissance_kwc,
-        "loss":       pertes,
-        "angle":      pente,
-        "aspect":     azimut_pvgis,
-        "outputformat": "json",
-        "raddatabase":  "PVGIS-SARAH2",
-    }
-
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        prod  = data["outputs"]["totals"]["fixed"]["E_y"]   # kWh/an/kWc
-        irrad = data["outputs"]["totals"]["fixed"]["H(i)_y"] # kWh/m²/an
-        return {"irradiation_kwh_m2": irrad, "production_kwh": prod, "ok": True}
-    except Exception as e:
-        return {"irradiation_kwh_m2": None, "production_kwh": None, "ok": False}
-
-
-def pvgisTousPans(pans, crs_source=2154):
-    """
-    Calcule le productible PVGIS pour tous les pans.
-    Convertit les coordonnées Lambert 93 → WGS84.
-    Ajoute irradiation_kwh_m2 et production_kwh à chaque pan.
+    @param[in]  pans       : liste de dicts (sortie ransac_tot)
+    @param[in]  mns_path   : chemin MNS IGN (.tif)
+    @param[in]  crs_source : EPSG source (2154 = Lambert 93)
+    @param[out] pans       : liste enrichie
     """
     transformer = Transformer.from_crs(crs_source, 4326, always_xy=True)
 
+    with rasterio.open(mns_path) as src:
+        mns = src.read(1).astype("float32")
+        tf  = src.transform
+        nd  = src.nodata
+        if nd is not None:
+            mns[mns == nd] = np.nan
+
+    dists = np.arange(10, int(100 / tf.a) + 1) * tf.a  # 5m à 100m
+
     for i, pan in enumerate(pans):
-        # centroïde du pan en Lambert 93
-        cx = pan["points"][:, 0].mean()
-        cy = pan["points"][:, 1].mean()
+        pts         = pan["points"]
+        cx, cy      = pts[:, 0].mean(), pts[:, 1].mean()
+        z_pan       = pts[:, 2].mean()
+        surf_reelle = MultiPoint(pts[:, :2]).convex_hull.area \
+                      / (np.cos(np.radians(pan["pente"])) or 1)
+        lon, lat    = transformer.transform(cx, cy)
 
-        # conversion en WGS84
-        lon, lat = transformer.transform(cx, cy)
+        # horizon 36 directions
+        horizon = []
+        for d in range(36):
+            az   = np.radians(d * 10)
+            cols = ((cx + np.sin(az) * dists - tf.c) / tf.a).astype(int)
+            rows = ((tf.f - (cy + np.cos(az) * dists)) / (-tf.e)).astype(int)
+            v    = (cols >= 0) & (cols < mns.shape[1]) & \
+                   (rows >= 0) & (rows < mns.shape[0])
+            if v.sum() == 0:
+                horizon.append(0.0)
+                continue
+            zv = mns[rows[v], cols[v]]
+            ok = ~np.isnan(zv) & (zv > -100)
+            elev = float(np.degrees(np.arctan2(
+                zv[ok] - z_pan, dists[v][ok])).max()) if ok.sum() else 0.0
+            horizon.append(round(min(max(elev, 0.0), 45.0), 2))
 
-        result = pvgisPan(lat, lon, pan["pente"], pan["azimut"])
-        pan["lat"]               = round(lat, 6)
-        pan["lon"]               = round(lon, 6)
-        pan["irradiation_kwh_m2"] = result["irradiation_kwh_m2"]
-        pan["production_kwh"]    = result["production_kwh"]
+        # azimut IGN → PVGIS
+        asp = round(pan["azimut"] - 180, 1)
+        if asp > 180:  asp -= 360
+        if asp < -180: asp += 360
+
+        try:
+            r = requests.get(
+                "https://re.jrc.ec.europa.eu/api/v5_3/PVcalc",
+                params={
+                    "lat": round(lat, 5), "lon": round(lon, 5),
+                    "peakpower": 1.0, "loss": 14,
+                    "angle": round(pan["pente"], 1), "aspect": asp,
+                    "outputformat": "json", "raddatabase": "PVGIS-SARAH3",
+                    "mountingplace": "building",
+                    "userhorizon": ",".join(f"{h:.2f}" for h in horizon),
+                },
+                timeout=10
+            )
+            r.raise_for_status()
+            d   = r.json()["outputs"]["totals"]["fixed"]
+            kwc = surf_reelle * 0.20
+            pan["surf_m2"]            = round(surf_reelle, 1)
+            pan["puissance_kwc"]      = round(kwc, 2)
+            pan["irradiation_kwh_m2"] = d["H(i)_y"]
+            pan["production_kwh_an"]  = round(d["E_y"] * kwc, 0)
+        except Exception:
+            pan["surf_m2"]            = round(surf_reelle, 1)
+            pan["puissance_kwc"]      = round(surf_reelle * 0.20, 2)
+            pan["irradiation_kwh_m2"] = None
+            pan["production_kwh_an"]  = None
 
         if i % 50 == 0:
             print(f"  {i}/{len(pans)} pans traités...")
 
-    ok = sum(1 for p in pans if p["production_kwh"] is not None)
-    print(f"PVGIS : {ok}/{len(pans)} pans avec résultat")
+    ok = sum(1 for p in pans if p["production_kwh_an"] is not None)
+    print(f"PVGIS : {ok}/{len(pans)} pans calculés")
     return pans

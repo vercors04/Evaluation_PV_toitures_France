@@ -39,12 +39,23 @@ def sauvPansGPKG(tous_pans, path_out, crs=2154):
         # enveloppe convexe 2D des points du pan
         geom = MultiPoint(pts[:, :2]).convex_hull
 
+        # lignes.append({
+        #     "bat_id": pan["bat_id"],
+        #     "pente":  pan["pente"],
+        #     "azimut": pan["azimut"],
+        #     "n_pts":  len(pts),
+        #     "geometry": geom
+        # })
         lignes.append({
-            "bat_id": pan["bat_id"],
-            "pente":  pan["pente"],
-            "azimut": pan["azimut"],
-            "n_pts":  len(pts),
-            "geometry": geom
+            "bat_id":             pan["bat_id"],
+            "pente":              pan["pente"],
+            "azimut":             pan["azimut"],
+            "n_pts":              len(pts),
+            "surf_m2":            pan.get("surf_m2"),
+            "puissance_kwc":      pan.get("puissance_kwc"),
+            "irradiation_kwh_m2": pan.get("irradiation_kwh_m2"),
+            "production_kwh_an":  pan.get("production_kwh_an"),
+            "geometry":           geom
         })
 
     gdf = gpd.GeoDataFrame(lignes, crs=crs)
