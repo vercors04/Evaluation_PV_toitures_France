@@ -1,0 +1,1 @@
+#comparaison des differents resultats obtenus sur les ombrages suivant les méthodes. 
