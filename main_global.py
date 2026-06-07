@@ -19,8 +19,7 @@ from src.ombrage.pvgis import *
 LAZ_NAME ="LHD_FXX_0495_6611_PTS_LAMB93_IGN69.copc.laz"#DIDIER
 LAZ_PATH = f"data/raw/DIDIER/{LAZ_NAME}" #DIDIER
 OUT_DIR = os.path.normpath("data/processed/DIDIER") #DIDIER
-MNS_NAME = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"   # DIDIER
-MNS_PATH = f"data/raw/DIDIER/{MNS_NAME}"                       # DIDIER
+MNS_NAME = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"   # DIDIER (non utilisé ici)
 
 GPKG_PATH = "data/raw/BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
 
@@ -55,7 +54,7 @@ def main():
 
     # PVGIS
     path_pans_pvg = os.path.join(OUT_DIR, f"{base}_LAZpans_pvgis.gpkg")
-    pans_pvg = pvgisTousPans(pans_ok, MNS_PATH)
+    pans_pvg = pvgisTousPans(pans_ok)
     sauvPansGPKG(pans_pvg, path_pans_pvg)
 
 
