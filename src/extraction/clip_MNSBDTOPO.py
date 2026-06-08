@@ -1,6 +1,7 @@
 import numpy as np
 import rasterio
 from rasterio.mask import mask as rasterio_mask
+from shapely.ops import unary_union
 from src.extraction.ExtractBDtopo import *
 
 
@@ -57,5 +58,3 @@ def clipMNSBDTOPO(mns_path, gdf):
 
     print(f"Bâtiments extraits : {len(buildings)}/{len(gdf)}")
     return buildings
-
-
