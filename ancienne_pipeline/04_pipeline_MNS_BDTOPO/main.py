@@ -1,9 +1,9 @@
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # accès au package src/
-from src.extraction.clip_MNSBDTOPO import *
-from src.detection.Ransac          import *
-from src.io.util                   import *
+from ancienne_pipeline.src.extraction.clip_MNSBDTOPO import *
+from ancienne_pipeline.src.detection.Ransac          import *
+from ancienne_pipeline.src.io.util                   import *
 
 
 

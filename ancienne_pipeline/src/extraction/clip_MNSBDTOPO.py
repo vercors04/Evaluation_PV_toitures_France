@@ -2,7 +2,7 @@ import numpy as np
 import rasterio
 from rasterio.mask import mask as rasterio_mask
 from shapely.ops import unary_union
-from src.extraction.ExtractBDtopo import *
+from ancienne_pipeline.src.extraction.ExtractBDtopo import *
 
 
 def clipMNSBDTOPO(mns_path, gdf):

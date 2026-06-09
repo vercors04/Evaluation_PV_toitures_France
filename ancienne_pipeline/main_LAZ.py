@@ -2,11 +2,11 @@ import os
 import sys
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # accès au package src/
-from src.detection.selec_Pans import *
-from src.extraction.clip_LAZ import *
-from src.detection.Ransac import *
-from src.io.util import *
-from src.ombrage.pvgis import *
+from ancienne_pipeline.src.detection.selec_Pans import *
+from ancienne_pipeline.src.extraction.clip_LAZ import *
+from ancienne_pipeline.src.detection.Ransac import *
+from ancienne_pipeline.src.io.util import *
+from ancienne_pipeline.src.ombrage.pvgis import *
 import time
 
 

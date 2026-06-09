@@ -2,10 +2,10 @@ import os
 import sys
 import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # accès au package src/
-from src.extraction.clip_MNSBDTOPO import *
-from src.extraction.clip_MNSBDTOPO_autre import *
-from src.detection.Ransac          import *
-from src.io.util                   import *
+from ancienne_pipeline.src.extraction.clip_MNSBDTOPO import *
+from ancienne_pipeline.src.extraction.clip_MNSBDTOPO_autre import *
+from ancienne_pipeline.src.detection.Ransac          import *
+from ancienne_pipeline.src.io.util                   import *
 
 MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
 MNS_PATH  = f"data/raw/DIDIER/{MNS_NAME}" #DIDIER
