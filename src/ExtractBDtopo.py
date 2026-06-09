@@ -65,7 +65,7 @@ def loadBuild(gpkg_path, tile_bounds):
     gdf = gdf[
         (gdf['etat_de_l_objet'] == 'En service') &
         (gdf['construction_legere'] == False)
-    ].copy()
+    ].copy().reset_index(drop=True)
 
     #on garde que les colonnes utiles
     gdf = gdf[['cleabs', 'nature', 'usage_1', 'hauteur',

@@ -48,22 +48,29 @@ def main():
     )
     print(f"clip pixels : {time.time()-t0:.1f}s")
 
-    t0 = time.time()
-    # masquage MNS/MNT par pans
-    pts_ok, masque_bat, mns, transform, meta = clip_MNSMNT_pans(
-        MNS_PATH, MNT_PATH, gdf, debug=True
-    )
-    print(f"clip pans : {time.time()-t0:.1f}s")
 
 
-    t0 = time.time()
-    # RANSAC par bâtiment
-    pans_tous = ransacTot(masque_bat, pts_ok, mns, transform, gdf)
 
-    gdf_pans  = gpd.GeoDataFrame(pans_tous, crs=gdf.crs)
-    gdf_pans.to_file(os.path.join(OUT_DIR, "pans.gpkg"), driver="GPKG")
-    print(f"RANSAC {len(gdf_pans)} pans : {time.time()-t0:.1f}s")
+
 
 
 if __name__ == "__main__":
     main()
+
+
+
+    # t0 = time.time()
+    # # masquage MNS/MNT par pans
+    # pts_ok, masque_bat, mns, transform, meta = clip_MNSMNT_pans(
+    #     MNS_PATH, MNT_PATH, gdf, debug=True
+    # )
+    # print(f"clip pans : {time.time()-t0:.1f}s")
+
+    
+    # t0 = time.time()
+    # # RANSAC par bâtiment
+    # pans_tous = ransacTot(masque_bat, pts_ok, mns, transform, gdf)
+
+    # gdf_pans  = gpd.GeoDataFrame(pans_tous, crs=gdf.crs)
+    # gdf_pans.to_file(os.path.join(OUT_DIR, "pans.gpkg"), driver="GPKG")
+    # print(f"RANSAC {len(gdf_pans)} pans : {time.time()-t0:.1f}s")
