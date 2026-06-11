@@ -1,6 +1,7 @@
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
+from scipy.ndimage import binary_erosion
 
 
 def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=False):
@@ -65,16 +66,20 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
     pente [~pts_ok] = np.nan
     aspect[~pts_ok] = np.nan
 
+    #on supr les points qui ont un voisin invalide (hors toiture) pour eviter les artefacts de pente/aspect aux bords des toits
+    kernel    = np.ones((3, 3), dtype=bool)   # voisinage 8-connexe, 1 pixel
+    pts_ok_erode = binary_erosion(pts_ok, structure=kernel)
+
     # --- masques finaux ---
     masque_incline = np.where(
-        pts_ok &
-        (pente >= 10) & (pente <= 45) &
+        pts_ok_erode &
+        (pente >= 10) & (pente <= 70) &
         (aspect >= 90) & (aspect <= 270),
         masque_bat, 0
     ).astype("int32")
 
     masque_plat = np.where(
-        pts_ok &
+        pts_ok_erode &
         (pente < 10),
         masque_bat, 0
     ).astype("int32")
@@ -88,7 +93,7 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
 
         for nom, arr, m in [
             ("debug_mnh_masque",     np.where(pts_ok, mnh, np.nan),            meta_float),
-            ("debug_pente_filtree", np.where((pente <= 45) & pts_ok, pente, np.nan), meta_float),
+            ("debug_pente_filtree", np.where((pente <= 70) & pts_ok, pente, np.nan), meta_float),
             ("debug_aspect",         aspect,         meta_float),
             ("debug_masque_incline", masque_incline, meta_int),
             ("debug_masque_plat",    masque_plat,    meta_int),

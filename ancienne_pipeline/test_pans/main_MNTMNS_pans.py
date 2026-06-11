@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+import geopandas as gpd
 from src.clip_MNTMNS_pixel import clip_MNSMNT_pixels
+from ancienne_pipeline.test_pans.clip_MNTMNS_pan import clip_MNSMNT_pans
 from src.ExtractBDtopo import tileBounds, loadBuild
-from src.horizon import compHZ
+from ancienne_pipeline.test_pans.Ransac import *
 
 MNT_NAME  = "LHD_FXX_0495_6611_MNT_O_0M50_LAMB93_IGN69.tif"#DIDIER
 MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
@@ -33,42 +35,22 @@ def main():
     base    = MNS_NAME.replace(".tif", "")
     path_mns = os.path.join(OUT_DIR, f"{base}_MNTMNSbatiments.tif")
     
-    
-    # chargement BDTOPO
     t0 = time.time()
-
-    print("--- BDTopo ---")
+    # chargement BDTOPO
     tile_bounds = tileBounds(MNS_NAME)
     gdf         = loadBuild(GPKG_PATH, tile_bounds)
     print(f"chargement BD TOPO : {time.time()-t0:.1f}s")
-    print()
 
-    # masquage MNS/MNT pixel par pixel
     t0 = time.time()
-    print("--- Clip MNS/MNT pixels ---")
+    # masquage MNS/MNT pixel par pixel
     masque_incline, masque_plat, pente, aspect, meta = clip_MNSMNT_pixels(
         MNS_PATH, MNT_PATH, gdf, debug=True
     )
     print(f"clip pixels : {time.time()-t0:.1f}s")
-    print()
-    
 
 
-    #Calcul des horizons avec GRASS GIS (via src/horizon.py)
-    t0 = time.time()
 
-    print("--- Horizons ---")
-    horizon_dir    = os.path.join(OUT_DIR, "horizon")
-    masque_toiture = (masque_incline > 0) | (masque_plat > 0)
-    compHZ(
-        mns_path       = MNS_PATH,
-        masque_toiture = masque_toiture,
-        out_dir        = horizon_dir,
-        n_directions=16, max_distance_m=100.0
-    )
-   
-    print(f"Calcul d'horizon terminé : {time.time()-t0:.1f}s")
-    print()
+
 
 
 
@@ -77,3 +59,18 @@ if __name__ == "__main__":
 
 
 
+    # t0 = time.time()
+    # # masquage MNS/MNT par pans
+    # pts_ok, masque_bat, mns, transform, meta = clip_MNSMNT_pans(
+    #     MNS_PATH, MNT_PATH, gdf, debug=True
+    # )
+    # print(f"clip pans : {time.time()-t0:.1f}s")
+
+    
+    # t0 = time.time()
+    # # RANSAC par bâtiment
+    # pans_tous = ransacTot(masque_bat, pts_ok, mns, transform, gdf)
+
+    # gdf_pans  = gpd.GeoDataFrame(pans_tous, crs=gdf.crs)
+    # gdf_pans.to_file(os.path.join(OUT_DIR, "pans.gpkg"), driver="GPKG")
+    # print(f"RANSAC {len(gdf_pans)} pans : {time.time()-t0:.1f}s")
