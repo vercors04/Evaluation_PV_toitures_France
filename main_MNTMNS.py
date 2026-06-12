@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+import numpy as np
 from src.clip_MNTMNS_pixel import clip_MNSMNT_pixels
 from src.ExtractBDtopo import tileBounds, loadBuild
 from src.horizon import compHZ
+from irradiance.irr_fct import *
 
 MNT_NAME  = "LHD_FXX_0495_6611_MNT_O_0M50_LAMB93_IGN69.tif"#DIDIER
 MNS_NAME  = "LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif"#DIDIER
@@ -64,12 +66,18 @@ def main():
         mns_path       = MNS_PATH,
         masque_toiture = masque_toiture,
         out_dir        = horizon_dir,
-        n_directions=16, max_distance_m=100.0
+        n_directions=36, max_distance_m=100.0
     )
    
     print(f"Calcul d'horizon terminé : {time.time()-t0:.1f}s")
     print()
 
+
+    #test irradiance simple
+    print("--- Irradiance simple ---")
+    t0 = time.time()
+    
+    print(f"Temps : {time.time()-t0:.1f}s")
 
 
 if __name__ == "__main__":
