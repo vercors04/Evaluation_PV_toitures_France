@@ -2,27 +2,14 @@ import os
 import time
 import numpy as np
 
-from irr_fct import *   
+from irr_fct import *
 
 
 # --- Zone a couvrir (bbox WGS84) ---
 LAT_MIN, LAT_MAX = 46.30, 46.60
 LON_MIN, LON_MAX = 0.05,  0.40
-PAS = 0.05 #pas grille meteo
 
-DOSSIER = "data/tables"      # un .npz par cellule, ecrit ici
-PAUSE = 1.0             # secondes entre deux requetes 
-
-
-def cheminTable(lat, lon):
-    """
-    Chemin du fichier table d'une cellule.
-    --------
-    @param[in] lat, lon : centre de cellule, multiples de PAS (degres WGS84)
-
-    @return chemin du .npz (ex: tables/table_46.55_0.35.npz)
-    """
-    return os.path.join(DOSSIER, f"table_{lat:.2f}_{lon:.2f}.npz")
+PAUSE = 1.0             # secondes entre deux requetes
 
 
 def grilleCellules():
@@ -44,30 +31,11 @@ def construireCellule(lat, lon):
     @param[in] lat, lon : centre de la cellule, en degres WGS84
     """
     df = telecharger(lat, lon)
-    B, D = transpAgr(df["poa_direct"], df["poa_sky_diffuse"], lat, lon)
-    np.savez_compressed(cheminTable(lat, lon), B=B, D=D,
+    B, D, SAZ, SEL = transpAgr(df["poa_direct"], df["poa_sky_diffuse"], lat, lon)
+    np.savez_compressed(cheminTable(lat, lon), B=B, D=D, SAZ=SAZ, SEL=SEL,
                         alphas=ALPHAS, betas=BETAS, lat=lat, lon=lon,
                         source="PVGIS-SARAH3 2005-2023, Perez")
 
-cache = {}
-def chargerTable(lat, lon):
-    """
-    Charge la table de la cellule contenant un point quelconque
-    (ex: le centre d'une tuile LiDAR). C'est LE point d'entree pour
-    la pipeline tuile : centreWGS84(...) -> chargerTable(...) -> B, D.
-    --------
-    @param[in] lat, lon : coordonnees quelconques, en degres WGS84
-
-    @return B, D : tableaux (n_alphas, n_betas, 12, 24) en W/m2
-    """
-    la = round(round(lat / PAS) * PAS, 2)
-    lo = round(round(lon / PAS) * PAS, 2)
-
-    if (la, lo) not in cache:
-        d = np.load(cheminTable(la, lo))
-        cache[(la, lo)] = (d["B"], d["D"])
-
-    return cache[(la, lo)]
 
 def main():
     os.makedirs(DOSSIER, exist_ok=True)

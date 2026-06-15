@@ -1,35 +1,34 @@
-import pvlib
+"""
+src/irradiance/irr_tuile.py
+Helper pour travailler sur UNE dalle (tests) : a partir du nom du fichier MNS IGN,
+retrouve ses coordonnees et le centre en WGS84 (pour charger la bonne cellule
+meteo). N'est PAS utilise par la pipeline finale (qui boucle sur les dalles).
+"""
 from pyproj import Transformer
 
-URL = "https://re.jrc.ec.europa.eu/api/v5_3/"   # PVGIS 5.3 (SARAH-3, 2005-2023)
 
 def nomCoord(MNS_name):
     """
-    Retourne les coordonnees du coin bas-gauche de la tuile, en km Lambert 93.
+    Coordonnees du coin nord-ouest de la tuile (convention IGN), en km Lambert 93.
     --------
-    @param[in] 
+    @param[in] MNS_name : nom du fichier MNS IGN (ex: LHD_FXX_0495_6611_MNS_O_0M50_LAMB93_IGN69.tif)
 
-    @return 
+    @return x_km, y_km : coin nord-ouest de la tuile, en km Lambert 93
     """
     base = MNS_name.replace(".tif", "")
     p = base.split("_")
-    x_str = p[2]
-    y_str = p[3]
-    return int(x_str), int(y_str)
-
+    return int(p[2]), int(p[3])
 
 
 def centreWGS84(x_km, y_km):
     """
     Centre de la tuile 1 km x 1 km, converti de Lambert 93 a WGS84.
     --------
-    @param[in] x_km, y_km : coordonnees du coin bas-gauche de la tuile, en km Lambert 93
+    @param[in] x_km, y_km : coin nord-ouest de la tuile, en km Lambert 93 (convention IGN)
 
-    @return lat, lon : coordonnees du centre de la tuile, en degees WGS84
+    @return lat, lon : coordonnees du centre de la tuile, en degres WGS84
     """
-    xc, yc = x_km * 1000 + 500, y_km * 1000 + 500
+    xc, yc = x_km * 1000 + 500, y_km * 1000 - 500   # -500 : le nom IGN donne le coin NORD-ouest
     tr = Transformer.from_crs(2154, 4326, always_xy=True)
     lon, lat = tr.transform(xc, yc)
     return lat, lon
-
-

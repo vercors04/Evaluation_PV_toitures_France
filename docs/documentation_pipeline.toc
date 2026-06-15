@@ -1,0 +1,82 @@
+\babel@toc {french}{}\relax 
+\contentsline {section}{\numberline {1}Le projet en un coup d'œil}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Objectif}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}La méthode de référence : Buffat et al. (2018)}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}État d'avancement}{3}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Architecture générale}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Les deux branches de la pipeline}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Arborescence et exécution}{4}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Les données d'entrée}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}LiDAR HD IGN : MNS et MNT}{5}{subsection.3.1}%
+\contentsline {paragraph}{Convention de nommage des dalles.}{5}{section*.2}%
+\contentsline {paragraph}{Valeur nodata.}{5}{section*.3}%
+\contentsline {subsection}{\numberline {3.2}BD TOPO : les emprises de bâtiments}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}PVGIS et SARAH-3 : le rayonnement solaire}{5}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Systèmes de coordonnées}{6}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Notions de rayonnement solaire}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Les composantes du rayonnement}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}La position du soleil}{7}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}La transposition : du plan horizontal au plan du toit}{7}{subsection.4.3}%
+\contentsline {paragraph}{Le direct : pure géométrie.}{7}{section*.4}%
+\contentsline {paragraph}{Le diffus : le modèle de Perez.}{7}{section*.5}%
+\contentsline {paragraph}{Le réfléchi : modèle isotrope au sol.}{8}{section*.6}%
+\contentsline {paragraph}{Total dans le plan.}{8}{section*.7}%
+\contentsline {subsection}{\numberline {4.4}L'ombrage par l'horizon}{8}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}De l'irradiance à l'irradiation : le profil (mois $\times $ heure)}{8}{subsection.4.5}%
+\contentsline {paragraph}{Pourquoi transposer \emph {avant} de moyenner ?}{8}{section*.8}%
+\contentsline {section}{\numberline {5}Branche B -- la géométrie : détection des toitures}{9}{section.5}%
+\contentsline {subsection}{\numberline {5.1}\texttt {main\_MNTMNS.py} : l'orchestrateur}{9}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}\texttt {src/geometrie/ExtractBDtopo.py}}{9}{subsection.5.2}%
+\contentsline {subsubsection}{\numberline {5.2.1}\texttt {tileBounds(mns\_name)} : du nom de fichier à l'emprise}{9}{subsubsection.5.2.1}%
+\contentsline {subsubsection}{\numberline {5.2.2}\texttt {loadBuild(gpkg\_path, tile\_bounds)} : charger et filtrer les bâtiments}{9}{subsubsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.3}\texttt {src/geometrie/clip\_MNTMNS\_pixel.py} : \texttt {clip\_MNSMNT\_pixels}}{10}{subsection.5.3}%
+\contentsline {subsubsection}{\numberline {5.3.1}Lecture des rasters et notion de transform affine}{10}{subsubsection.5.3.1}%
+\contentsline {subsubsection}{\numberline {5.3.2}Le MNH et la rasterisation des bâtiments}{10}{subsubsection.5.3.2}%
+\contentsline {subsubsection}{\numberline {5.3.3}Le pré-masque de validité}{11}{subsubsection.5.3.3}%
+\contentsline {subsubsection}{\numberline {5.3.4}Pente et aspect par différences finies}{11}{subsubsection.5.3.4}%
+\contentsline {subsubsection}{\numberline {5.3.5}L'érosion morphologique : nettoyer les bords}{11}{subsubsection.5.3.5}%
+\contentsline {subsubsection}{\numberline {5.3.6}Les masques finaux}{12}{subsubsection.5.3.6}%
+\contentsline {subsubsection}{\numberline {5.3.7}Les exports de contrôle}{12}{subsubsection.5.3.7}%
+\contentsline {subsection}{\numberline {5.4}\texttt {src/geometrie/horizon.py} : \texttt {compHZ}}{12}{subsection.5.4}%
+\contentsline {subsubsection}{\numberline {5.4.1}Le principe : un lancer de rayons discret}{12}{subsubsection.5.4.1}%
+\contentsline {subsubsection}{\numberline {5.4.2}La vectorisation : la clé des performances}{12}{subsubsection.5.4.2}%
+\contentsline {section}{\numberline {6}Branche A -- la météo : tables d'irradiance par cellule}{13}{section.6}%
+\contentsline {subsection}{\numberline {6.1}\texttt {src/irradiance/irr\_fct.py} : le module central}{13}{subsection.6.1}%
+\contentsline {subsubsection}{\numberline {6.1.1}Les constantes}{14}{subsubsection.6.1.1}%
+\contentsline {subsubsection}{\numberline {6.1.2}\texttt {telecharger(lat, lon)} : la requête PVGIS}{14}{subsubsection.6.1.2}%
+\contentsline {subsubsection}{\numberline {6.1.3}\texttt {transpAgr(bhi, dhi, lat, lon)} : le cœur du calcul}{14}{subsubsection.6.1.3}%
+\contentsline {paragraph}{Coût mesuré.}{16}{section*.9}%
+\contentsline {subsubsection}{\numberline {6.1.4}\texttt {profMH(serie, cles)} : la réduction (mois, heure)}{16}{subsubsection.6.1.4}%
+\contentsline {subsubsection}{\numberline {6.1.5}\texttt {totAb(B, D)} : le contrôle annuel}{16}{subsubsection.6.1.5}%
+\contentsline {subsubsection}{\numberline {6.1.6}\texttt {cheminTable} et \texttt {chargerTable} : le stockage}{16}{subsubsection.6.1.6}%
+\contentsline {subsection}{\numberline {6.2}\texttt {src/irradiance/irr\_dep.py} : le script de campagne}{17}{subsection.6.2}%
+\contentsline {subsubsection}{\numberline {6.2.1}\texttt {grilleCellules()}}{17}{subsubsection.6.2.1}%
+\contentsline {subsubsection}{\numberline {6.2.2}\texttt {construireCellule(lat, lon)}}{17}{subsubsection.6.2.2}%
+\contentsline {subsubsection}{\numberline {6.2.3}\texttt {main()} : la boucle robuste}{17}{subsubsection.6.2.3}%
+\contentsline {subsection}{\numberline {6.3}\texttt {src/irradiance/irr\_tuile.py} : le pont dalle $\to $ cellule (helper)}{18}{subsection.6.3}%
+\contentsline {section}{\numberline {7}La phase tuile : du pixel au GeoPackage}{18}{section.7}%
+\contentsline {subsection}{\numberline {7.1}L'idée : un profil par pixel, masqué, puis intégré}{18}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}\texttt {irrPixels} : profil, ombrage et énergie de chaque pixel}{19}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}\texttt {masquerHorizon} : l'ombrage du direct}{20}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}\texttt {agregerBatiment} : sommer par bâtiment}{20}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Du gisement à la production : le modèle PV simple}{21}{subsection.7.5}%
+\contentsline {paragraph}{Qu'est-ce qu'un kWc ?}{21}{section*.10}%
+\contentsline {paragraph}{Le facteur de production.}{21}{section*.11}%
+\contentsline {paragraph}{Puissance et m$^2$/kWc : une conséquence, pas un paramètre.}{21}{section*.12}%
+\contentsline {subsection}{\numberline {7.6}\texttt {irradianceTuile} : l'orchestrateur}{22}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Le GeoPackage de sortie}{22}{subsection.7.7}%
+\contentsline {paragraph}{Lire une ligne (exemple réel, dalle DIDIER).}{22}{section*.13}%
+\contentsline {paragraph}{Validation sur la dalle DIDIER (Poitiers, 0495\_6611).}{22}{section*.14}%
+\contentsline {section}{\numberline {8}Conventions, unités et pièges récapitulés}{23}{section.8}%
+\contentsline {section}{\numberline {9}Ce qu'il reste à faire}{23}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Ombrage : ce qui est capté, ce qui ne l'est pas}{23}{subsection.9.1}%
+\contentsline {paragraph}{Ce qui est correctement capté.}{23}{section*.15}%
+\contentsline {paragraph}{Ce qui est manqué.}{23}{section*.16}%
+\contentsline {paragraph}{Que faire sans les voisines ?}{24}{section*.17}%
+\contentsline {subsection}{\numberline {9.2}Interpolation bilinéaire $(\alpha , \beta )$}{24}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Profils mensuels et toits plats}{24}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Modèle PV complet (raffinement)}{24}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Passage à l'échelle : multi-dalles et fusion par région}{25}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}Validation}{25}{subsection.9.6}%
+\contentsline {subsection}{\numberline {9.7}Limites connues et choix à réévaluer}{25}{subsection.9.7}%
+\contentsline {section}{Références}{26}{section*.18}%

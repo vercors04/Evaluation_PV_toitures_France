@@ -1,12 +1,16 @@
+import os
+
 import numpy as np
-import pandas as pd
 import pvlib
 
 
-ALBEDO = 0.2                      # pouvoir réfléchissant d'une suface  - Buffat 2018, Solar Wizard
-ALPHAS = np.arange(0, 360, 15)    # grille grossiere d'orientations (24 valeurs)
-BETAS = np.arange(0, 51, 10)      # grille grossiere de pentes (5 valeurs)
+ALBEDO = 0.2                      # pouvoir réfléchissant d'une surface - Buffat 2018, Solar Wizard
+ALPHAS = np.arange(0, 360, 15)    # grille grossiere d'orientations (24 valeurs, 0=Nord, 90=Est)
+BETAS = np.arange(0, 71, 10)      # grille grossiere de pentes (8 valeurs, couvre les toits 10-70 deg du masque incline)
 N_JOURS = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
+
+PAS = 0.05                        # pas de la grille meteo PVGIS (degres)
+DOSSIER = "data/tables"           # un .npz par cellule meteo, ecrit/lu ici
 
 URL = "https://re.jrc.ec.europa.eu/api/v5_3/"   # PVGIS 5.3 (SARAH-3, 2005-2023)
 
@@ -14,21 +18,20 @@ URL = "https://re.jrc.ec.europa.eu/api/v5_3/"   # PVGIS 5.3 (SARAH-3, 2005-2023)
 def transpAgr(bhi, dhi, lat, lon):
     """Transpose CHAQUE pas de temps (Perez) puis moyenne par (mois, heure).
 
-    @param[in]  lat, lon : coordonnees du centre de la tuile, en degees WGS84
     @param[in]  bhi, dhi : Series (W/m2, plan horizontal) indexees par un DatetimeIndex UTC.
-    
-    @return B, D : tableaux (24 alphas x 10 betas) de l'irradiance directe et diffuse
-    @return sp   : DataFrame position solaire (azimuth, apparent_elevation) indexe par DatetimeIndex
+    @param[in]  lat, lon : coordonnees du centre de la cellule, en degres WGS84
+
+    @return B, D     : tableaux (24 alphas, 8 betas, 12 mois, 24 heures), irradiance directe et diffuse en W/m2
+    @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil en degres
+                       (sauvegardes pour le masquage par l'horizon au niveau tuile, sans recalcul)
     """
     times = bhi.index
     ghi = (bhi + dhi).clip(lower=0)
 
     sp = pvlib.solarposition.get_solarposition(times, lat, lon)
-
-    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"])
-    dni = pd.Series(dni, index=times).fillna(0).clip(lower=0)
-
+    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"]).fillna(0)
     dni_extra = pvlib.irradiance.get_extra_radiation(times)
+    airmass = pvlib.atmosphere.get_relative_airmass(sp["apparent_zenith"])
     cles = [times.month, times.hour]
 
     B = np.zeros((len(ALPHAS), len(BETAS), 12, 24), np.float32)
@@ -39,12 +42,17 @@ def transpAgr(bhi, dhi, lat, lon):
                 surface_tilt=b, surface_azimuth=a,
                 solar_zenith=sp["apparent_zenith"], solar_azimuth=sp["azimuth"],
                 dni=dni, ghi=ghi, dhi=dhi,
-                dni_extra=dni_extra, albedo=ALBEDO, model="perez")
+                dni_extra=dni_extra, airmass=airmass, albedo=ALBEDO, model="perez")
             direct = poa["poa_direct"].fillna(0)
             diffus = (poa["poa_sky_diffuse"] + poa["poa_ground_diffuse"]).fillna(0)
             B[i, j] = profMH(direct, cles)
             D[i, j] = profMH(diffus, cles)
-    return B, D, sp
+
+    # position moyenne du soleil par (mois, heure) ; moyenner l'azimut est sans risque :
+    # en France le soleil ne passe jamais par le nord (0/360) de jour
+    SAZ = profMH(sp["azimuth"], cles)
+    SEL = profMH(sp["apparent_elevation"], cles)
+    return B, D, SAZ, SEL
 
 
 def profMH(serie, cles):
@@ -66,27 +74,60 @@ def profMH(serie, cles):
 def totAb(B, D):
     """Irradiation annuelle dans le plan, kWh/m2/an, par (alpha, beta).
     --------
-    @param[in] B, D : tableaux (24 alphas x 10 betas) de l'irradiance directe et diffuse, en W/m2, par (mois, heure)
-    @return E : tableau (24 alphas x 10 betas) de l'irradiation annuelle dans le plan, en kWh/m2/an
+    @param[in] B, D : tableaux (n_alphas, n_betas, 12, 24) de l'irradiance directe et diffuse, en W/m2, par (mois, heure)
+    @return E : tableau (n_alphas, n_betas) de l'irradiation annuelle dans le plan, en kWh/m2/an
     """
     E = (B + D).astype(np.float64)                       # W/m2 moyens par bin
     return (E * N_JOURS[None, None, :, None]).sum(axis=(2, 3)) / 1000.0
 
 
-
 def telecharger(lat, lon):
     """
-    Telecharge les series horaires PVGIS pour la cellule de 0,05 deg contenant le pts actuel.
+    Telecharge les series horaires PVGIS pour la cellule de 0,05 deg contenant le point demande.
     --------
-    @param[in] lat, lon : coordonnees du coin bas-gauche de la tuile, en degees WGS84
+    @param[in] lat, lon : coordonnees du point (ici le centre de la cellule), en degres WGS84
 
     @return df : DataFrame contenant les donnees PVGIS
-   """ 
+   """
     out = pvlib.iotools.get_pvgis_hourly(
         lat, lon, start=2005, end=2023,
-        raddatabase="PVGIS-SARAH3",      
+        raddatabase="PVGIS-SARAH3",
         components=True, surface_tilt=0, surface_azimuth=0,
-        usehorizon=False,                # a voir si on prends cet horizon en +
+        usehorizon=False,                # a voir si on prend cet horizon en +
         url=URL, map_variables=True)
     df = out[0]
     return df
+
+
+def cheminTable(lat, lon):
+    """
+    Chemin du fichier table d'une cellule.
+    --------
+    @param[in] lat, lon : centre de cellule, multiples de PAS (degres WGS84)
+
+    @return chemin du .npz (ex: data/tables/table_46.55_0.35.npz)
+    """
+    return os.path.join(DOSSIER, f"table_{lat + 0.0:.2f}_{lon + 0.0:.2f}.npz")  # + 0.0 : evite "-0.00"
+
+
+_cache = {}
+
+def chargerTable(lat, lon):
+    """
+    Charge la table de la cellule contenant un point quelconque
+    (ex: le centre d'une tuile LiDAR). C'est LE point d'entree pour
+    la pipeline tuile : centreWGS84(...) -> chargerTable(...).
+    --------
+    @param[in] lat, lon : coordonnees quelconques, en degres WGS84
+
+    @return B, D     : tableaux (n_alphas, n_betas, 12, 24) en W/m2
+    @return SAZ, SEL : tableaux (12, 24), azimut et elevation du soleil en degres
+    """
+    la = round(round(lat / PAS) * PAS, 2)
+    lo = round(round(lon / PAS) * PAS, 2)
+
+    if (la, lo) not in _cache:
+        d = np.load(cheminTable(la, lo))
+        _cache[(la, lo)] = (d["B"], d["D"], d["SAZ"], d["SEL"])
+
+    return _cache[(la, lo)]

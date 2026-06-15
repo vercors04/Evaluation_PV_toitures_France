@@ -1,10 +1,12 @@
+import os
+
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
 from scipy.ndimage import binary_erosion
 
 
-def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=False):
+def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug_dir=None):
     """
     masques pixels toiture depuis MNS, MNT et BD TOPO.
     --------
@@ -13,10 +15,10 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
     @param[in]  gdf      : GeoDataFrame BD TOPO filtrée
     @param[in]  buffer   : tampon en m autour des géométries BD
     @param[in]  mnh_min   : seuil MNH pour filtrer pixels non-toiture
-    @param[in]  debug    : si True, exporte rasters intermédiaires
+    @param[in]  debug_dir : dossier d'export des rasters intermédiaires (None = pas d'export)
 
-    @param[out] masque_incline : np.ndarray 2D  — index GDF bâtiment si toit incliné (10-60°), 0 sinon
-    @param[out] masque_plat    : np.ndarray 2D  — index GDF bâtiment si toit plat (<10°),      0 sinon
+    @param[out] masque_incline : np.ndarray 2D  — index GDF + 1 du bâtiment si toit incliné (10-70°), 0 sinon
+    @param[out] masque_plat    : np.ndarray 2D  — index GDF + 1 du bâtiment si toit plat (<10°),      0 sinon
     @param[out] pente          : np.ndarray 2D  — pente en degrés
     @param[out] aspect         : np.ndarray 2D  — aspect en degrés convention boussole
     @param[out] meta           : dict           — métadonnées rasterio pour exports ultérieurs
@@ -42,7 +44,7 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
 
     geometries = gdf.geometry.buffer(buffer)
     masque_bat = rasterize( #rasterize prends une liste de paire, forme et valeur
-        zip(geometries, gdf.index), #en gros on garde que la colonne des geometrie, y met un buffer 
+        zip(geometries, gdf.index + 1), #index + 1 : l'index GDF commence a 0, qui est la valeur de fond
         out_shape=mns.shape,
         transform=transform,
         fill=0,
@@ -85,11 +87,10 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
     ).astype("int32")
     
     # --- debug ---
-    if debug:
-        import os
-        debug_dir  = os.path.dirname("data/processed/DIDIER/")
-        meta_float = {**meta, "dtype": "float32", "nodata": -9999}
-        meta_int   = {**meta, "dtype": "int32",   "nodata": 0}
+    if debug_dir is not None:
+        os.makedirs(debug_dir, exist_ok=True)
+        meta_float = {**meta, "dtype": "float32", "nodata": -9999, "compress": "lzw"}
+        meta_int   = {**meta, "dtype": "int32",   "nodata": 0,     "compress": "lzw"}
 
         for nom, arr, m in [
             ("debug_mnh_masque",     np.where(pts_ok, mnh, np.nan),            meta_float),
@@ -98,8 +99,9 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug=F
             ("debug_masque_incline", masque_incline, meta_int),
             ("debug_masque_plat",    masque_plat,    meta_int),
         ]:
-            arr_out = np.where(np.isnan(arr), m["nodata"], arr).astype(m["dtype"])
+            if np.issubdtype(arr.dtype, np.floating):           # NaN -> nodata (isnan plante sur les int)
+                arr = np.where(np.isnan(arr), m["nodata"], arr)
             with rasterio.open(os.path.join(debug_dir, f"{nom}.tif"), "w", **m) as dst:
-                dst.write(arr_out, 1)
+                dst.write(arr.astype(m["dtype"]), 1)
 
     return masque_incline, masque_plat, pente, aspect, meta

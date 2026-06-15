@@ -1,5 +1,5 @@
 """
-src/horizon.py
+src/geometrie/horizon.py
 Calcul des angles d'horizon par raycast numpy.
 """
 
@@ -21,10 +21,13 @@ def compHZ(mns_path, masque_toiture, out_dir,
     @param[in]  n_directions    : nombre de directions azimutales
     @param[in]  max_distance_m  : rayon de recherche en mètres
 
-    @param[out] out_paths : list[str] — chemins des GeoTIFF produits :
-                            horizon_000.tif, ..., horizon_350.tif
-                            valeurs en radians, nodata=-9999 hors pixels de toiture
-                            convention boussole : 000=Nord, 090=Est, 180=Sud, 270=Ouest
+    @param[out] horizon : np.ndarray (N_pixels_toiture, n_directions) — angle d'horizon
+                          en degrés, dans l'ordre de np.where(masque_toiture) (lignes C).
+                          La colonne d correspond a l'azimut d * (360/n_directions).
+                          Convention boussole : 000=Nord, 090=Est, 180=Sud, 270=Ouest.
+
+    Ecrit aussi, en effet de bord, un GeoTIFF par direction (horizon_000.tif ...
+    horizon_350.tif, nodata=-9999) pour visualisation dans QGIS.
     """
     os.makedirs(out_dir, exist_ok=True)
 
@@ -38,7 +41,7 @@ def compHZ(mns_path, masque_toiture, out_dir,
     if nodata is not None:
         mns[mns == nodata] = np.nan
 
-    meta.update(dtype="float32", count=1, nodata=-9999.0)
+    meta.update(dtype="float32", count=1, nodata=-9999.0, compress="lzw")
 
     H, W        = mns.shape
     max_dist_px = int(max_distance_m / res)  #conersion m en pixel
@@ -47,9 +50,9 @@ def compHZ(mns_path, masque_toiture, out_dir,
     x, y = np.where(masque_toiture) #x et y de chaque pixel
     z0 = mns[x, y]   # altitude de chaque pixel toit
 
-    out_paths = []
+    horizon = np.full((len(x), n_directions), -9999.0, np.float32)  # (N pixels, n_directions), en degres
 
-    for phi_deg in range(0, 360, step):
+    for d, phi_deg in enumerate(range(0, 360, step)):
 
         phi_rad = np.deg2rad(phi_deg)
 
@@ -72,17 +75,18 @@ def compHZ(mns_path, masque_toiture, out_dir,
             angle = np.arctan2(dz, k * res)
 
             
-            theta = np.maximum(theta, angle) #on garde le max
+            theta = np.fmax(theta, angle) #on garde le max (fmax ignore les NaN du MNS)
 
-        # raster de sortie pour la direction phi
+        horizon[:, d] = np.degrees(theta)        # garde l'horizon en memoire (pour la phase tuile)
+
+        # raster de sortie pour la direction phi, en degres (visualisation QGIS)
         out = np.full((H, W), -9999.0, dtype=np.float32)
-        out[x, y] = theta
+        out[x, y] = np.degrees(theta)
 
         out_tif = os.path.join(out_dir, f"horizon_{phi_deg:03d}.tif")
         with rasterio.open(out_tif, "w", **meta) as dst:
             dst.write(out, 1)
 
-        out_paths.append(out_tif)
         print(f"  horizon {phi_deg:3d} deg")
 
-    return out_paths
+    return horizon
