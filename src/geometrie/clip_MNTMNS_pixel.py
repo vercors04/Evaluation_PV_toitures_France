@@ -60,7 +60,7 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug_d
     )
 
 
-    # --- gradient → pente + aspect ---
+    # --- pente + aspect ---
     dz_dy, dz_dx = np.gradient(mns, resolution)
     pente  = np.degrees(np.arctan(np.sqrt(dz_dx**2 + dz_dy**2)))
     aspect = np.degrees(np.arctan2(-dz_dx, dz_dy)) % 360
@@ -75,8 +75,9 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug_d
     # --- masques finaux ---
     masque_incline = np.where(
         pts_ok_erode &
-        (pente >= 10) & (pente <= 70) &
-        (aspect >= 90) & (aspect <= 270),
+        (pente >= 10) & (pente <= 70) 
+        #& (aspect >= 90) & (aspect <= 270) a changer
+        ,
         masque_bat, 0
     ).astype("int32")
 

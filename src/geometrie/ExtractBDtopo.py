@@ -59,7 +59,7 @@ def loadBuild(gpkg_path, tile_bounds):
         gdf = gpd.read_file(gpkg_path, layer='batiment', bbox=tile_bounds) #on lit que le carré qui nous interesse
     else:
         gdf = gpd.read_file(gpkg_path, layer='batiment')
-
+    #le gpk a un index spatial qui permet de lire que les bat qui sont dans la tuile. 
     total = len(gdf)
 
     gdf = gdf[

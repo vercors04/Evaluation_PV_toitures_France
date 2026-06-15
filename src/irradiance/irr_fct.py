@@ -25,11 +25,11 @@ def transpAgr(bhi, dhi, lat, lon):
     @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil en degres
                        (sauvegardes pour le masquage par l'horizon au niveau tuile, sans recalcul)
     """
-    times = bhi.index
+    times = bhi.index #les heures
     ghi = (bhi + dhi).clip(lower=0)
 
-    sp = pvlib.solarposition.get_solarposition(times, lat, lon)
-    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"]).fillna(0)
+    sp = pvlib.solarposition.get_solarposition(times, lat, lon) #pour chaques heures le zenith apparant, l'azimut l'élévation apparente du soleil
+    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"]).fillna(0) #reconstrucion du DNI
     dni_extra = pvlib.irradiance.get_extra_radiation(times)
     airmass = pvlib.atmosphere.get_relative_airmass(sp["apparent_zenith"])
     cles = [times.month, times.hour]
