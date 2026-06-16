@@ -75,11 +75,18 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug_d
     # --- masques finaux ---
     masque_incline = np.where(
         pts_ok_erode &
-        (pente >= 10) & (pente <= 70) 
-        #& (aspect >= 90) & (aspect <= 270) a changer
-        ,
+        (pente >= 10) & (pente <= 45),
         masque_bat, 0
     ).astype("int32")
+
+    masque_incline_or = np.where(
+        pts_ok_erode &
+        (pente >= 10) & (pente <= 45) 
+        & (aspect >= 90) & (aspect <= 270),
+        masque_bat, 0
+    ).astype("int32")
+
+
 
     masque_plat = np.where(
         pts_ok_erode &
@@ -95,14 +102,14 @@ def clip_MNSMNT_pixels(mns_path, mnt_path, gdf, buffer=1.2, mnh_min=1.5, debug_d
 
         for nom, arr, m in [
             ("debug_mnh_masque",     np.where(pts_ok, mnh, np.nan),            meta_float),
-            ("debug_pente_filtree", np.where((pente <= 70) & pts_ok, pente, np.nan), meta_float),
             ("debug_aspect",         aspect,         meta_float),
             ("debug_masque_incline", masque_incline, meta_int),
             ("debug_masque_plat",    masque_plat,    meta_int),
+            ("debug_masque_incline_90_270", masque_incline_or, meta_int)
         ]:
             if np.issubdtype(arr.dtype, np.floating):           # NaN -> nodata (isnan plante sur les int)
                 arr = np.where(np.isnan(arr), m["nodata"], arr)
             with rasterio.open(os.path.join(debug_dir, f"{nom}.tif"), "w", **m) as dst:
                 dst.write(arr.astype(m["dtype"]), 1)
 
-    return masque_incline, masque_plat, pente, aspect, meta
+    return masque_incline_or, masque_incline, masque_plat, pente, aspect, meta

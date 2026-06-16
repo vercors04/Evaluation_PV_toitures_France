@@ -8,8 +8,8 @@ import numpy as np
 import rasterio
 
 
-def compHZ(mns_path, masque_toiture, out_dir,
-                    n_directions=36, max_distance_m=500.0):
+def compHZ(mns_path, masque_toiture,
+                    n_directions=36, max_distance_m=500.0, debug_dir = None):
     """
     Calcule les angles d'horizon dans n_directions directions depuis le MNS.
     Pour chaque pixel de toiture et chaque direction, avance pas à pas
@@ -29,7 +29,6 @@ def compHZ(mns_path, masque_toiture, out_dir,
     Ecrit aussi, en effet de bord, un GeoTIFF par direction (horizon_000.tif ...
     horizon_350.tif, nodata=-9999) pour visualisation dans QGIS.
     """
-    os.makedirs(out_dir, exist_ok=True)
 
     # Lecture fic
     with rasterio.open(mns_path) as src:
@@ -79,14 +78,16 @@ def compHZ(mns_path, masque_toiture, out_dir,
 
         horizon[:, d] = np.degrees(theta)        # garde l'horizon en memoire (pour la phase tuile)
 
-        # raster de sortie pour la direction phi, en degres (visualisation QGIS)
-        out = np.full((H, W), -9999.0, dtype=np.float32)
-        out[x, y] = np.degrees(theta)
-
-        out_tif = os.path.join(out_dir, f"horizon_{phi_deg:03d}.tif")
-        with rasterio.open(out_tif, "w", **meta) as dst:
-            dst.write(out, 1)
-
         print(f"  horizon {phi_deg:3d} deg")
+
+        if debug_dir is not None :
+            out = np.full((H, W), -9999.0, dtype=np.float32)
+            out[x, y] = np.degrees(theta)
+
+            out_tif = os.path.join(debug_dir, f"horizon_{phi_deg:03d}.tif")
+            with rasterio.open(out_tif, "w", **meta) as dst:
+                dst.write(out, 1)
+
+        
 
     return horizon

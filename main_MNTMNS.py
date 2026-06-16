@@ -45,7 +45,7 @@ def main():
     # masquage MNS/MNT pixel par pixel
     t0 = time.time()
     print("--- Clip MNS/MNT pixels ---")
-    masque_incline, masque_plat, pente, aspect, meta = clip_MNSMNT_pixels(
+    masque_incline_or, masque_incline, masque_plat, pente, aspect, meta = clip_MNSMNT_pixels(
         MNS_PATH, MNT_PATH, gdf, debug_dir=OUT_DIR
     )
     print(f"clip pixels : {time.time()-t0:.1f}s")
@@ -57,13 +57,13 @@ def main():
     t0 = time.time()
 
     print("--- Horizons ---")
-    horizon_dir    = os.path.join(OUT_DIR, "horizon")
     masque_toiture = (masque_incline > 0) | (masque_plat > 0)
     horizon = compHZ(
         mns_path       = MNS_PATH,
         masque_toiture = masque_toiture,
-        out_dir        = horizon_dir,
-        n_directions=36, max_distance_m=100.0
+        n_directions=36, max_distance_m=100.0,
+        #debug_dir = os.path.join(OUT_DIR, "horizon")
+        debug_dir = None
     )
 
     print(f"Calcul d'horizon terminé : {time.time()-t0:.1f}s")
@@ -76,7 +76,7 @@ def main():
 
     lat, lon = centreWGS84(*nomCoord(MNS_NAME))
     out_gpkg = os.path.join(OUT_DIR, MNS_NAME.replace(".tif", "_irradiance.gpkg"))
-    irradianceTuile(masque_incline, masque_plat, pente, aspect, gdf, horizon, lat, lon, out_gpkg)
+    irradianceTuile(masque_incline_or, masque_incline, masque_plat, pente, aspect, gdf, horizon, lat, lon, out_gpkg)
 
     print(f"GeoPackage écrit : {out_gpkg}  ({time.time()-t0:.1f}s)")
 

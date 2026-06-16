@@ -38,14 +38,14 @@ def masquerHorizon(B_pix, horizon, SAZ, SEL):
     return B_pix
 
 
-def irrPixels(masque_incline, masque_plat, pente, aspect, B, D, SAZ, SEL, horizon, alphas, betas):
+def irrPixels(masque_incline_or, masque_incline, masque_plat, pente, aspect, B, D, SAZ, SEL, horizon, alphas, betas):
     """
     Irradiation annuelle et surface reelle de chaque pixel de toiture, ombrage compris.
     Pour chaque pixel : on lit le profil (mois, heure) de la case (orientation, pente)
     la plus proche, on eteint le direct a l'ombre, on integre sur l'annee, et on
     multiplie par la surface reelle du pixel.
     --------
-    @param[in] masque_incline, masque_plat : 2D int — index gdf + 1 du batiment, 0 sinon
+    @param[in] masque_incline, masque_incline_or, masque_plat : 2D int — index gdf + 1 du batiment, 0 sinon
     @param[in] pente, aspect : 2D float — par pixel, en degres
     @param[in] B, D          : tables (n_alphas, n_betas, 12, 24) direct et diffus, W/m2
     @param[in] SAZ, SEL      : (12, 24) position moyenne du soleil, en degres
@@ -74,18 +74,27 @@ def irrPixels(masque_incline, masque_plat, pente, aspect, B, D, SAZ, SEL, horizo
 
     B_pix = masquerHorizon(B_pix, horizon, SAZ, SEL)
 
-    # integration -> kWh/m2/an (variante de totAb, par pixel)
-    e_m2 = ((B_pix + D_pix) * N_JOURS[None, :, None]).sum(axis=(1, 2)) / 1000.0
-    surf = 0.25 / np.cos(np.radians(p))             # 0.25 m2 projetes / cos(pente)
 
-    return pd.DataFrame({
-        "id":      masque_bat[toit] - 1,            # index du batiment dans gdf
-        "energie": e_m2 * surf,                     # kWh/an
-        "surf":    surf,
-        "pente":   p,
-        "secteur": np.round(a / 45).astype(int) % 8,
-        "incline": masque_incline[toit] > 0,
+    surf = 0.25 / np.cos(np.radians(p))             # 0.25 m2 projetes / cos(pente)
+    #energie par mois pour les stats
+    e_mois = ((B_pix + D_pix) * N_JOURS[None, :, None]).sum(axis=2) / 1000.0  # (N,12) kWh/m2
+    e_mois = e_mois * surf[:, None]                                           # (N,12) kWh
+    TRIM = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]] 
+    
+
+    out = pd.DataFrame({
+        "id":             masque_bat[toit] - 1,            # index du batiment dans gdf
+        "energie":        e_mois.sum(axis=1),                     # kWh/an, sur TOUT le toit
+        "surf":           surf,
+        "pente":          p,
+        "secteur":        np.round(a / 45).astype(int) % 8,
+        "incline_or": masque_incline_or[toit] > 0, # incline ET oriente sud
+        "incline":        masque_incline[toit] > 0,        # incline, toutes directions
     })
+
+    for t, mois in enumerate(TRIM, start=1):
+        out[f"energie_T{t}"] = e_mois[:, mois].sum(axis=1)
+    return out
 
 
 def agregerBatiment(df, gdf):
@@ -97,35 +106,63 @@ def agregerBatiment(df, gdf):
 
     @return out : GeoDataFrame, 1 ligne par batiment ayant >= 1 pixel de toit
     """
-    inc = df[df.incline]
+    inc    = df[df.incline]              
+    inc_or = df[df.incline_or]       
+    plat   = df[~df.incline]   
+
+    oriente = df[df.incline_or | ~df.incline]
 
     res = pd.DataFrame({
-        "irr_an_kwh":       df.groupby("id").energie.sum(),
-        "surf_inclinee_m2": inc.groupby("id").surf.sum(),
-        "surf_plate_m2":    df[~df.incline].groupby("id").surf.sum(),
-        "pente_moy":        inc.groupby("id").pente.mean(),
-        "nb_pixels":        df.groupby("id").size(),
+        "irr_an_kwh":              df.groupby("id").energie.sum(),       # toute la toiture
+        "irr_an_kwh_oriente":      oriente.groupby("id").energie.sum(),  # plat + sud
+        "surf_inclinee_m2":        inc.groupby("id").surf.sum(),         # incl. toutes directions
+        "surf_inclinee_or_m2": inc_or.groupby("id").surf.sum(),      # incl. orientee sud
+        "surf_plate_m2":           plat.groupby("id").surf.sum(),
+        "pente_moy":               inc.groupby("id").pente.mean(),       # pente moy, toutes orientations
+        "nb_pixels":               df.groupby("id").size(),
     })
-    for s, nom in enumerate(SECTEURS):              # surface inclinee par orientation
+    for s, nom in enumerate(SECTEURS):
         res[f"surf_{nom}_m2"] = inc[inc.secteur == s].groupby("id").surf.sum()
 
+    for t in range(1, 5):
+        res[f"prod_T{t}_kwh_or"] = (oriente.groupby("id")[f"energie_T{t}"].sum()
+                                 * TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO)
+
     res = res.fillna(0.0)
-    res["surf_tot_m2"]   = res.surf_inclinee_m2 + res.surf_plate_m2
-    res["irr_an_kwh_m2"] = res.irr_an_kwh / res.surf_tot_m2
 
-    # modele PV simple : puissance et production decoulent du meme rendement
-    res["puissance_kwc"] = res.surf_tot_m2 * TAUX_COUVERTURE * RENDEMENT_MODULE
-    res["prod_an_kwh"]   = res.irr_an_kwh  * TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO
+    res["surf_tot_m2"]         = res.surf_inclinee_m2 + res.surf_plate_m2          # plat + incl. toutes directions
+    #res["irr_an_kwh_m2"]       = res.irr_an_kwh / res.surf_tot_m2                  # sur toute la toiture
 
-    return gdf.join(res, how="inner")               # garde les batiments avec >= 1 pixel de toit
+    res["puissance_kwc_or"]    = (res.surf_inclinee_or_m2 + res.surf_plate_m2) * TAUX_COUVERTURE * RENDEMENT_MODULE
+    res["prod_an_kwh"]         = res.irr_an_kwh         * TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO
+    res["prod_an_kwh_or"] = res.irr_an_kwh_oriente * TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO
+
+        
+    out = gdf.join(res, how="inner")
+
+    ordre = [
+        "cleabs", "nature", "usage_1", "hauteur", "nombre_d_etages",
+        "nb_pixels",
+        "surf_tot_m2", "surf_plate_m2",
+        "surf_inclinee_m2", "surf_inclinee_or_m2",
+        "pente_moy",
+        "surf_N_m2", "surf_NE_m2", "surf_E_m2", "surf_SE_m2",
+        "surf_S_m2", "surf_SO_m2", "surf_O_m2", "surf_NO_m2",
+        "irr_an_kwh", "irr_an_kwh_oriente",
+        "puissance_kwc_or", "prod_an_kwh", "prod_an_kwh_or",
+        "prod_T1_kwh_or", "prod_T2_kwh_or", "prod_T3_kwh_or", "prod_T4_kwh_or",
+        "geometry",
+    ]
+    return out[ordre]
 
 
-def irradianceTuile(masque_incline, masque_plat, pente, aspect, gdf, horizon, lat, lon, out_path):
+
+def irradianceTuile(masque_incline_or, masque_incline, masque_plat, pente, aspect, gdf, horizon, lat, lon, out_path):
     """
     Calcul complet pour une dalle : lookup table -> irradiance par pixel (avec
     ombrage) -> agregation + production PV par batiment -> ecriture du GeoPackage.
     --------
-    @param[in] masque_incline, masque_plat, pente, aspect : sorties du clip MNS/MNT
+    @param[in] masque_incline, masque_incline_or, masque_plat, pente, aspect : sorties du clip MNS/MNT
     @param[in] gdf      : GeoDataFrame des batiments de la dalle
     @param[in] horizon  : (N, n_dir) angles d'horizon par pixel (sortie de compHZ)
     @param[in] lat, lon : centre de la dalle, en degres WGS84 (-> cellule meteo)
@@ -134,7 +171,7 @@ def irradianceTuile(masque_incline, masque_plat, pente, aspect, gdf, horizon, la
     @return out : GeoDataFrame ecrit
     """
     B, D, SAZ, SEL = chargerTable(lat, lon)
-    df  = irrPixels(masque_incline, masque_plat, pente, aspect,
+    df  = irrPixels(masque_incline_or, masque_incline, masque_plat, pente, aspect,
                     B, D, SAZ, SEL, horizon, ALPHAS, BETAS)
     out = agregerBatiment(df, gdf)
     out.to_file(out_path, driver="GPKG")
