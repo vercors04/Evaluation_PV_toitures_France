@@ -2,14 +2,9 @@ import os
 import time
 import numpy as np
 
-from irr_fct import *
+from irradiance.meteo.irr_fct import telecharger, transpAgr, cheminTable
+from src.config import *
 
-
-# --- Zone a couvrir (bbox WGS84) ---
-LAT_MIN, LAT_MAX = 46.30, 46.60
-LON_MIN, LON_MAX = 0.05,  0.40
-
-PAUSE = 1.0             # secondes entre deux requetes
 
 
 def grilleCellules():
@@ -25,8 +20,7 @@ def grilleCellules():
 
 def construireCellule(lat, lon):
     """
-    Construit et sauvegarde la table d'une cellule (methode M1 :
-    series horaires PVGIS 2005-2023 + transposition pas-a-pas).
+    Construit et sauvegarde la table d'une cellule 
     --------
     @param[in] lat, lon : centre de la cellule, en degres WGS84
     """

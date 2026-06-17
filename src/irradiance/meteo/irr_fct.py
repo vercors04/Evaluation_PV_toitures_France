@@ -2,17 +2,9 @@ import os
 
 import numpy as np
 import pvlib
+from src.config import *
 
 
-ALBEDO = 0.2                      # pouvoir réfléchissant d'une surface - Buffat 2018, Solar Wizard
-ALPHAS = np.arange(0, 360, 15)    # grille grossiere d'orientations (24 valeurs, 0=Nord, 90=Est)
-BETAS = np.arange(0, 71, 10)      # grille grossiere de pentes (8 valeurs, couvre les toits 10-70 deg du masque incline)
-N_JOURS = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])
-
-PAS = 0.05                        # pas de la grille meteo PVGIS (degres)
-DOSSIER = "data/tables"           # un .npz par cellule meteo, ecrit/lu ici
-
-URL = "https://re.jrc.ec.europa.eu/api/v5_3/"   # PVGIS 5.3 (SARAH-3, 2005-2023)
 
 
 def transpAgr(bhi, dhi, lat, lon):

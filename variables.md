@@ -23,12 +23,12 @@
 | `surf_tot_m2`                                               | Surface de toit exploitable                   | Plat + incliné        |
 | `surf_plate_m2`                                             | Surface plate                                 | Plat                  |
 | `surf_inclinee_m2`                                          | Surface inclinée                              | Incliné (toutes dir.) |
-| `surf_inclinee_or_m2`                                       | Surface inclinée orientée                     | Incliné sud           |
-| `pente_moy`                                                 | Pente moyenne des pans inclinés               | Incliné (toutes dir.) |
-| `surf_N_m2` … `surf_NO_m2`                                  | Surface inclinée par orientation (8 secteurs) | Incliné (toutes dir.) |
+| `surf_inclinee_or_m2`                                       | Surface inclinée orientée                     | Incliné azimut choisis|
+| `pente_moy_incl`                                            | Pente moyenne des pans inclinés               | Incliné (toutes dir.) |
+| `surf_N_m2_incl` … `surf_NO_m2_incl`                        | Surface inclinée par orientation (8 secteurs) | Incliné (toutes dir.) |
 | `irr_an_kwh`                                                | Irradiation reçue / an                        | Toute la toiture      |
-| `irr_an_kwh_oriente`                                        | Irradiation reçue / an                        | Plat + orienté        |
-| `puissance_kwc_or`                                          | Puissance crête installable                   | Plat + orienté        |
 | `prod_an_kwh`                                               | Production PV / an                            | Toute la toiture      |
-| `prod_an_kwh_or`                                            | Production PV / an                            | Plat + orienté        |
-| `prod_T1_kwh` … `prod_T4_kwh`                               | Production PV par trimestre                   | Plat + orienté        |
+| `irr_an_kwh_orp`                                            | Irradiation reçue / an                        | Plat + orienté        |
+| `puissance_kwc_orp`                                         | Puissance crête installable                   | Plat + orienté        |
+| `prod_an_kwh_orp`                                           | Production PV / an                            | Plat + orienté        |
+| `prod_T1_kwh_orp` … `prod_T4_kwh_orp`                       | Production PV par trimestre                   | Plat + orienté        |
