@@ -1,4 +1,11 @@
 import numpy as np
+import os
+
+#dossiers de sortie/entree 
+OUT_DIR_RAW =  os.path.normpath("data/raw/TEST/dalles")
+OUT_DIR_PROCESSED = os.path.normpath("data/processed/TEST")
+GPKG_BDTOPO = "data/raw/BDT_3-5_GPKG_LAMB93_D086-ED2026-03-15.gpkg"
+DIR_GEOJSON = os.path.normpath("data/raw/TEST/geojson")
 
 # construction table meteo
 URL     = "https://re.jrc.ec.europa.eu/api/v5_3/"    # PVGIS 5.3 (SARAH-3, 2005-2023)

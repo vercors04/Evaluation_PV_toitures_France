@@ -1,7 +1,7 @@
 import geopandas as gpd
 
 
-def loadBuild(gpkg_path, tile_bounds):
+def loadBuild(gdf, tile_bounds, polygone):
     """
     Charge et filtre les batiments exploitables depuis la BD TOPO.
     --------
@@ -11,10 +11,13 @@ def loadBuild(gpkg_path, tile_bounds):
     @return gdf : GeoDataFrame filtre, index 0..n-1, colonnes
                   cleabs, nature, usage_1, hauteur, nombre_d_etages, geometry
     """
-    if tile_bounds is not None:
-        gdf = gpd.read_file(gpkg_path, layer='batiment', bbox=tile_bounds)   # index spatial : lit juste la tuile
-    else:
-        gdf = gpd.read_file(gpkg_path, layer='batiment')
+    # if tile_bounds is not None:
+    #     gdf = gpd.read_file(gpkg_path, layer='batiment', bbox=tile_bounds)   # index spatial : lit juste la tuile
+    # else:
+    #     gdf = gpd.read_file(gpkg_path, layer='batiment')
+
+    # gdf = gdf[gdf.intersects(polygone)]
+    gdf = gdf [gdf.intersects(bbox=tile_bounds)] 
 
     total = len(gdf)
     gdf = gdf[

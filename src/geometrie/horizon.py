@@ -35,7 +35,7 @@ def compHZ(mns, masque_toiture, res, n_directions=N_DIRECTIONS, max_distance_m=D
             xk = np.clip(np.round(x + k * dx).astype(int), 0, H - 1)
             yk = np.clip(np.round(y + k * dy).astype(int), 0, W - 1)
             angle = np.arctan2(mns[xk, yk] - z0, k * res)
-            theta = np.fmax(theta, angle)            # fmax ignore les NaN (hors donnees)
+            theta = np.fmax(theta, angle)            # ignore hors donnees
         horizon[:, d] = np.degrees(theta)
 
     return horizon

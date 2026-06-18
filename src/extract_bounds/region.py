@@ -2,6 +2,8 @@ import geopandas as gpd
 import pandas as pd
 import requests
 import shapely.ops
+from main import DIR_GEOJSON
+import os
 
 def region(nom_region):
     """
@@ -92,7 +94,8 @@ def region(nom_region):
                     dalles_finales = dalles_finales.drop_duplicates(subset='geometry') 
                     resultats_dalles[type_couche] = dalles_finales
                     print(f"{len(dalles_finales)} dalles {type_couche} récupérées pour la région.")
-                    
+            
+            gdf.to_file(os.path.join(DIR_GEOJSON, f"{nom_region}.geojson"), driver="GeoJSON")
     except Exception as e:
         print(f"Erreur globale sur la région : {e}")
 

@@ -31,10 +31,10 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
     pente  = np.degrees(np.arctan(np.hypot(dz_dx, dz_dy)))
     aspect = np.degrees(np.arctan2(-dz_dx, dz_dy)) % 360
 
-    # erosion : enleve les bords de toit (gradient fausse par les voisins hors toit)
+    # on enleve les bords de toit (a mentionner dans le rapport)
     valid = binary_erosion(pts_ok, np.ones((3, 3), dtype=bool))
 
-    masque_bat = np.where(valid, masque_bat, 0).astype("int32")   # validite encodee une fois pour toutes
+    masque_bat = np.where(valid, masque_bat, 0).astype("int32")   
     pente[~valid]  = np.nan
     aspect[~valid] = np.nan
     return pente, aspect, masque_bat, mnh

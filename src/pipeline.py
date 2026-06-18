@@ -10,26 +10,21 @@ from src.irradiance.meteo.irr_fct import chargerTable
 from src.irradiance.irr_calcul import irrPixels
 from src.util.agregation import agregerBatiment
 from src.debug import debug_pipeline as debug
+from src.util.autre import hBat
 
 
-def traiterDalle(mns_path, mnt_path, gpkg_bdtopo, out_gpkg, debug_dir=None):
+def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
     """
     Traite une dalle : BD TOPO -> geometrie -> masques -> horizon -> irradiance
     -> agregation par batiment -> ecriture du GeoPackage.
     --------
     @param[in] mns_path, mnt_path : chemins des rasters MNS / MNT IGN
     @param[in] gpkg_bdtopo        : chemin du GeoPackage BD TOPO
-    @param[in] out_gpkg           : chemin du GeoPackage de sortie
     @param[in] debug_dir          : si fourni, exporte les rasters de debug
 
     @return out : GeoDataFrame ecrit (1 ligne par batiment)
     """
     mns_name = os.path.basename(mns_path)
-
-    # ------ ouverture BDTPOPO ------
-    t0 = time.time()
-    gdf = loadBuild(gpkg_bdtopo, tileBounds(mns_name))
-    print(f"BD TOPO    : {time.time()-t0:.1f}s")
 
 
 
@@ -60,9 +55,9 @@ def traiterDalle(mns_path, mnt_path, gpkg_bdtopo, out_gpkg, debug_dir=None):
 
 
     # ------ agregation par bat + ecriture ------
-    out = agregerBatiment(df, gdf)
-    out.to_file(out_gpkg, driver="GPKG")
-    print(f"Irradiance : {time.time()-t0:.1f}s  ->  {out_gpkg}")
+    hauteur = hBat (mnh, masque_bat, 0.95)
+    out = agregerBatiment(df, gdf, hauteur)
+    print(f"Irradiance : {time.time()-t0:.1f}s ")
 
 
 

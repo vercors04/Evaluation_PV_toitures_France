@@ -2,6 +2,9 @@ import geopandas as gpd
 import pandas as pd
 import requests
 import shapely.ops
+from config import DIR_GEOJSON
+import os
+
 
 def departement(recherche_dep):
     """
@@ -96,10 +99,14 @@ def departement(recherche_dep):
                     dalles_finales = dalles_finales.drop_duplicates(subset='geometry') 
                     resultats_dalles[type_couche] = dalles_finales
                     print(f"{len(dalles_finales)} dalles MNS et {len(dalles_finales)} dalles MNT trouvées")
-                    gdf.to_file(f"data/processed/departements/departement_{recherche_dep}.geojson", driver="GeoJSON")
+
                 else:
                     print(f"Aucune dalle {type_couche} n'a pu être récupérée au total.")
                     return resultats_dalles
+                
+
+            gdf.to_file(os.path.join(DIR_GEOJSON, f"{recherche_dep}.geojson"), driver="GeoJSON")
+    
     except Exception as e:
         print(f"Erreur : {e}")
     return resultats_dalles

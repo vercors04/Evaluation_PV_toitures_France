@@ -19,8 +19,9 @@ def main():
             sys.exit(f"Fichier introuvable : {p}")
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    out_gpkg = os.path.join(OUT_DIR, MNS_NAME.replace(".tif", "_irradiance.gpkg"))
-    traiterDalle(MNS_PATH, MNT_PATH, MNS_NAME, GPKG_BDTOPO, out_gpkg, debug_dir=OUT_DIR)
+    gpkg_path = os.path.join(OUT_DIR, MNS_NAME.replace(".tif", "_irradiance.gpkg"))
+    out = traiterDalle(MNS_PATH, MNT_PATH, GPKG_BDTOPO, debug_dir=OUT_DIR)
+    out.to_file(gpkg_path, driver="GPKG")
 
 
 if __name__ == "__main__":

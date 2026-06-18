@@ -1,7 +1,8 @@
 import geopandas as gpd
-import pandas as pd
 import requests
 import shapely.ops
+import os
+from config import DIR_GEOJSON
 
 def commune(nom_commune,num_departement):
 
@@ -83,7 +84,9 @@ def commune(nom_commune,num_departement):
 
                 except Exception as e:
                     print(f"Erreur : {e}")
-            gdf.to_file(f"data/raw/TEST/geojson/{nom_commune}.geojson", driver="GeoJSON")
+
+                    
+            gdf.to_file(os.path.join(DIR_GEOJSON, f"{nom_commune}{num_departement}.geojson"), driver="GeoJSON")
             return resultats_dalles
     except Exception as e:
         print(f"Erreur : {e}")

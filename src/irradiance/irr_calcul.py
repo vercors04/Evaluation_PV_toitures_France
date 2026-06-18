@@ -55,7 +55,7 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
     # case (orientation, pente) la plus proche -> profil (mois, heure) par pixel
     i = np.round(a / pas_a).astype(int) % len(ALPHAS)
     j = np.clip(np.round(p / pas_b).astype(int), 0, len(BETAS) - 1)
-    B_pix = masquerHorizon(B[i, j], horizon, SAZ, SEL)      # (N,12,24) direct ombrage (copie)
+    B_pix = masquerHorizon(B[i, j], horizon, SAZ, SEL)      # (N,12,24) direct ombrage 
     D_pix = D[i, j]                                         # (N,12,24) diffus
 
     surf   = res**2 / np.cos(np.radians(p))                

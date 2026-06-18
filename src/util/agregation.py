@@ -5,7 +5,7 @@ from src.config import SECTEURS, TAUX_COUVERTURE, RENDEMENT_MODULE, PERFORMANCE_
 PV = TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO   # kWh recus -> kWh produits
 
 
-def agregerBatiment(df, gdf):
+def agregerBatiment(df, gdf, hauteur):
     """
     Agrege les pixels par batiment, applique le modele PV, joint a la BD TOPO.
     Production / puissance : base "orientee" = plat + incline sud (pans nord exclus).
@@ -35,6 +35,9 @@ def agregerBatiment(df, gdf):
     for t in range(1, 5):                          # production par trimestre (orientee)
         res[f"prod_T{t}_kwh_orp"] = oriente.groupby("id")[f"energie_T{t}"].sum() * PV
 
+
+    res["hauteur_pts"] = hauteur #hauteur a partir du mnh pas bdtopo
+
     res = res.fillna(0.0)                           # mettre des 0 au lieu de NaN
 
     res["surf_tot_m2"]      = res.surf_inclinee_m2 + res.surf_plate_m2
@@ -44,7 +47,7 @@ def agregerBatiment(df, gdf):
 
     out = gdf.join(res, how="inner")               # garde les batiments avec >= 1 pixel de toit
     ordre = [
-        "cleabs", "nature", "usage_1", "hauteur", "nombre_d_etages",
+        "cleabs", "nature", "usage_1", "hauteur", "hauteur_pts", "nombre_d_etages",
         "nb_pixels", "surf_tot_m2", "surf_plate_m2",
         "surf_inclinee_m2", "surf_inclinee_or_m2", "pente_moy",
         "surf_N_m2_incl", "surf_NE_m2_incl", "surf_E_m2_incl", "surf_SE_m2_incl",
