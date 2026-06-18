@@ -1,6 +1,12 @@
 import numpy as np
 import os
 
+#tri toitures
+SURF_MIN = 5
+HAUT_MIN = 2
+HAUT_MAX = 35
+
+
 #dossiers de sortie/entree 
 OUT_DIR_RAW =  os.path.normpath("data/raw/TEST/dalles")
 OUT_DIR_PROCESSED = os.path.normpath("data/processed/TEST")

@@ -77,10 +77,14 @@ def batiments(echelle, nom_zone, code_dep=None):
     if liste_geodf:
         geodf_complet=pd.concat(liste_geodf,ignore_index=True)
         gdf_final = geodf_complet[geodf_complet.intersects(geom_echelle)]
-        # gdf_final = gdf_final[
-        #              (gdf_final['etat_de_l_objet'] == 'En service') &
-        #              (gdf_final['construction_legere'] == False)
-        #         ]
+        NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']
+
+        gdf_final = gdf_final[
+            (gdf_final['etat_de_l_objet'] == 'En service') &
+            (gdf_final['construction_legere'] == False) &
+            (gdf_final['nature'].isin(NATURE_OK))
+        ]
+
 
         gdf_final = (gdf_final[['cleabs', 'nature', 'usage_1', 'hauteur',
                                         'nombre_d_etages', 'geometry']].reset_index(drop=True)) .to_crs(2154)

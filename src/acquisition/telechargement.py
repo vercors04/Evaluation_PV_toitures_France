@@ -1,13 +1,11 @@
-import os
-import requests
+import os, time, requests
 
 
-def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST'):
+def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST', n_essais=4, pause=3):
     """
     Télécharge un fichier distant en continu (stream) et le sauvegarde localement.
     ---------------------------------------------------------------------------------------
     @param[in]  url          : Lien HTTP(S) de téléchargement du fichier.
-    @param[in]  nom_fichier  : Nom sous lequel le fichier sera enregistré sur le disque.
     @param[in]  dossier_dest : Chemin du dossier cible (créé automatiquement si inexistant).
 
     @param[out] chemin       : Chaîne de caractères (str), chemin absolu ou relatif du fichier téléchargé.
@@ -15,15 +13,23 @@ def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST'):
     os.makedirs(dossier_dest, exist_ok=True)
     chemin = os.path.join(dossier_dest, nom_fichier)
 
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
+    for essai in range(1, n_essais + 1):
+        try:
+            r = requests.get(url, stream=True, timeout=120)
+            r.raise_for_status()
+            with open(chemin, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print(f"{nom_fichier} telecharge")
+            return chemin  #si tout ok un seul essai
+        
 
-    with open(chemin, 'wb') as fichier:
-        for chunk in response.iter_content(chunk_size=8192):
-            fichier.write(chunk)
-            
-    print(f"{nom_fichier} téléchargé")
-    return chemin
+        except requests.RequestException as e:
+            print(f"  {nom_fichier} : essai {essai}/{n_essais} echoue ({e})")
+            if essai < n_essais:
+                time.sleep(pause * essai)  
+                
+    raise RuntimeError(f"echec apres {n_essais} essais : {nom_fichier}")
 
 
 
