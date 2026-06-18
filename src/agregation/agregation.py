@@ -59,3 +59,11 @@ def agregerBatiment(df, gdf, hauteur):
         "geometry",
     ]
     return out[ordre]
+
+
+
+def merger_cleabs(gdf):
+    """Un batiment a cheval sur 2 dalles apparait 2x -> on garde le plus gros morceau."""
+    return (gdf.sort_values("nb_pixels", ascending=False)
+               .drop_duplicates("cleabs")
+               .reset_index(drop=True))

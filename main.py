@@ -1,15 +1,20 @@
 from src.acquisition.commune import commune
 from src.acquisition.departement import departement
 from src.acquisition.region import region
-from src.acquisition.telechargement import *
+from src.acquisition.telechargement import telecharger_fichier, liste_telechargement
 from src.pipeline import traiterDalle
-import concurrent.futures
-#from src.tuile.bd_topo import loadBuild
+from src.agregation.agregation import merger_cleabs
+from src.agregation.select import filtrer
 from src.tuile.donnees_dalle import tileBounds
-import os
-from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON
-import geopandas as gpd
 from src.acquisition.batiments import batiments
+
+import os
+import concurrent.futures
+import geopandas as gpd
+import time
+
+from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON
+
 
 
 def main():
@@ -37,32 +42,31 @@ def main():
         code_dep = input("Entrez le numéro de département : ").strip()
         dictionnaire_resultats = commune(nom_zone, code_dep)
         echelle="commune"
-        #polygone = gpd.read_file(os.path.join(DIR_GEOJSON, nom_zone + num_departement + ".geojson"))
 
     elif choix == "2":
         nom_zone = input("Entrez un département ou son numéro : ").strip().replace("'", "''").replace(" ", "_") 
         dictionnaire_resultats = departement(nom_zone)
         echelle="departement"
-        #polygone = gpd.read_file(os.path.join(DIR_GEOJSON, nom_zone + ".geojson"))
    
     elif choix == "3":
         nom_zone=input("Entrez le nom d'une région: ").strip().replace("'", "''").replace(" ", "_") 
         dictionnaire_resultats = region(nom_zone)
         echelle="region"
-        #polygone = gpd.read_file(os.path.join(DIR_GEOJSON, nom_zone + ".geojson"))
 
     else:
         print('Choisissez entre 1,2 et 3.')
         return None
     
+    t0 = time.time()
     gdf_bati = batiments(echelle, nom_zone, code_dep) 
+    print(f"extraction bdtopo-batiments  : {time.time()-t0:.1f}s")
 
     if gdf_bati is None or gdf_bati.empty:
         print("Pas de bat dans cette region / mal orthographie"); return None
     
 
 
-    gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}.gpkg")
+    gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}{code_dep or ''}.gpkg")
 
     
 
@@ -79,11 +83,14 @@ def main():
                     continue 
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex: 
+                    t0 = time.time()
                     f_mnt = ex.submit(telecharger_fichier, url_mnt, nom_mnt, OUT_DIR_RAW)
                     f_mns = ex.submit(telecharger_fichier, url_mns, nom_mns, OUT_DIR_RAW)
 
                 mnt_path = f_mnt.result()
                 mns_path = f_mns.result()
+                print(f"Telechargement MNS MNT : {time.time()-t0:.1f}s")
+
 
                 out = traiterDalle(mns_path, mnt_path, gdf_dalle)
                 if out is not None and not out.empty:
@@ -97,7 +104,27 @@ def main():
             except Exception as e:
                 print(f"ECHEC dalle {nom_mns} : {e}")
         
-       
+
+
+    #supression filtre fin 
+    if os.path.exists(gpkg_path):
+        t0 = time.time()
+        g = gpd.read_file(gpkg_path)
+        print("nombre bat avant merge+filtre  :", len(g))
+
+        g = merger_cleabs(g)       
+        print("apres merge      :", len(g))
+
+        g = filtrer(g)           
+        print("apres filtre     :", len(g))
+
+        print(f"Filtrage batiment post gpkg : {time.time()-t0:.1f}s")
+
+        g.to_file(gpkg_path, driver="GPKG", layer="batiments")  
+        print(f"Final : {len(g)} batiments")
 
 if __name__ == "__main__":
+    t0 = time.time()
     main()
+    dt = time.time() - t0
+    print(f"Temps total : {int(dt // 60)} min {dt % 60:.0f} s")
