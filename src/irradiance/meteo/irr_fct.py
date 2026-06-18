@@ -63,16 +63,6 @@ def profMH(serie, cles):
     return out
 
 
-def totAb(B, D):
-    """Irradiation annuelle dans le plan, kWh/m2/an, par (alpha, beta).
-    --------
-    @param[in] B, D : tableaux (n_alphas, n_betas, 12, 24) de l'irradiance directe et diffuse, en W/m2, par (mois, heure)
-    @return E : tableau (n_alphas, n_betas) de l'irradiation annuelle dans le plan, en kWh/m2/an
-    """
-    E = (B + D).astype(np.float64)                       # W/m2 moyens par bin
-    return (E * N_JOURS[None, None, :, None]).sum(axis=(2, 3)) / 1000.0
-
-
 def telecharger(lat, lon):
     """
     Telecharge les series horaires PVGIS pour la cellule de 0,05 deg contenant le point demande.
