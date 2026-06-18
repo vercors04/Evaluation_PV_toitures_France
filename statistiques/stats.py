@@ -6,7 +6,7 @@ import numpy as np
 
 
 def main():
-    #['cleabs', 'nature', 'usage_1', 'hauteur', 'nombre_d_etages', 'irr_an_kwh', 'surf_inclinee_m2', 'surf_plate_m2', 'pente_moy', 'nb_pixels', 'surf_N_m2', 'surf_NE_m2', 'surf_E_m2', 'surf_SE_m2', 'surf_S_m2', 'surf_SO_m2', 'surf_O_m2', 'surf_NO_m2', 'surf_tot_m2', 'irr_an_kwh_m2', 'puissance_kwc', 'prod_an_kwh', 'geometry']
+    #['cleabs', 'nature', 'usage_1', 'hauteur', 'nombre_d_etages', 'irr_an_kwh', 'surf_inclinee_m2', 'surf_plate_m2', 'pente_moy_incl', 'nb_pixels', 'surf_N_m2_incl', 'surf_NE_m2_incl', 'surf_E_m2_incl', 'surf_SE_m2_incl', 'surf_S_m2_incl', 'surf_SO_m2_incl', 'surf_O_m2_incl_incl', 'surf_NO_m2_incl', 'surf_tot_m2', 'irr_an_kwh_m2', 'puissance_kwc', 'prod_an_kwh', 'geometry']
     gdf=gpd.read_file("05_Stats/stats_totales_dalles_didier.gpkg")
 
     with open("05_Stats/bilan_statistiques.md", "w", encoding="utf-8") as f:
@@ -110,7 +110,7 @@ def main():
         print("\nMETHODE 1================================================================", file=f)
 
 
-        orientations=['surf_N_m2','surf_NE_m2','surf_E_m2','surf_SE_m2','surf_S_m2','surf_SO_m2','surf_O_m2','surf_NO_m2']
+        orientations=['surf_N_m2_incl','surf_NE_m2_incl','surf_E_m2_incl','surf_SE_m2_incl','surf_S_m2_incl','surf_SO_m2_incl','surf_O_m2_incl_incl','surf_NO_m2_incl']
 
         orientation_principale=gdf[orientations].idxmax(axis=1)
         
@@ -118,16 +118,16 @@ def main():
         liste_toits_nord=[]
         liste_toits_E_O=[]
         for i, orientation in orientation_principale.items():
-            if orientation in ['surf_SE_m2', 'surf_S_m2', 'surf_SO_m2']:
+            if orientation in ['surf_SE_m2_incl', 'surf_S_m2_incl', 'surf_SO_m2_incl']:
                 liste_toits_sud.append(i) 
-            elif orientation in ['surf_N_m2', 'surf_NE_m2', 'surf_NO_m2']:
+            elif orientation in ['surf_N_m2_incl', 'surf_NE_m2_incl', 'surf_NO_m2_incl']:
                 liste_toits_nord.append(i) 
             else:
                 liste_toits_E_O.append(i)
 
-        pte_sud = gdf.loc[liste_toits_sud, 'pente_moy'].mean()
-        pte_nord = gdf.loc[liste_toits_nord, 'pente_moy'].mean()
-        pte_E_O = gdf.loc[liste_toits_E_O, 'pente_moy'].mean()
+        pte_sud = gdf.loc[liste_toits_sud, 'pente_moy_incl'].mean()
+        pte_nord = gdf.loc[liste_toits_nord, 'pente_moy_incl'].mean()
+        pte_E_O = gdf.loc[liste_toits_E_O, 'pente_moy_incl'].mean()
 
         puissance_sud = gdf.loc[liste_toits_sud, 'puissance_kwc'].sum()
         puissance_nord = gdf.loc[liste_toits_nord, 'puissance_kwc'].sum()
@@ -162,9 +162,9 @@ def main():
         print("[Représentation graphique de la production](production_par_orientation.png)", file=f)
 
         print("\nMETHODE 2================================================================", file=f)
-        surface_sud = gdf['surf_S_m2'] + gdf['surf_SE_m2'] + gdf['surf_SO_m2']
-        surface_nord = gdf['surf_N_m2'] + gdf['surf_NE_m2'] + gdf['surf_NO_m2']
-        surface_est_ouest = gdf['surf_E_m2'] + gdf['surf_O_m2']
+        surface_sud = gdf['surf_S_m2_incl'] + gdf['surf_SE_m2_incl'] + gdf['surf_SO_m2_incl']
+        surface_nord = gdf['surf_N_m2_incl'] + gdf['surf_NE_m2_incl'] + gdf['surf_NO_m2_incl']
+        surface_est_ouest = gdf['surf_E_m2_incl'] + gdf['surf_O_m2_incl']
 
         seuil = gdf['surf_tot_m2'] * 0.49
 
@@ -175,21 +175,21 @@ def main():
         if len(gdf_sud) > 0:
             prod_sud = gdf_sud['prod_an_kwh'].sum()
             puiss_sud = gdf_sud['puissance_kwc'].sum()
-            pente_sud = gdf_sud['pente_moy'].mean()
+            pente_sud = gdf_sud['pente_moy_incl'].mean()
             irr_m2_sud = gdf_sud['irr_an_kwh_m2'].mean()
             print(f"Groupe SUD        : {len(gdf_sud)} bâtiments | Pente moyenne: {pente_sud:4.1f}° | Puiss : {puiss_sud:7,.1f} kWc | Prod : {prod_sud:10,.0f} kWh/an | Irradiation moyenne: {irr_m2_sud:6.0f} kWh/m2", file=f)
 
         if len(gdf_est_ouest) > 0:
             prod_eo = gdf_est_ouest['prod_an_kwh'].sum()
             puiss_eo = gdf_est_ouest['puissance_kwc'].sum()
-            pente_eo = gdf_est_ouest['pente_moy'].mean()
+            pente_eo = gdf_est_ouest['pente_moy_incl'].mean()
             irr_m2_eo = gdf_est_ouest['irr_an_kwh_m2'].mean()
             print(f"Groupe EST/OUEST  : {len(gdf_est_ouest)} bâtiments | Pente moyenne: {pente_eo:4.1f}° | Puiss : {puiss_eo:7,.1f} kWc | Prod : {prod_eo:10,.0f} kWh/an | Irradiation moyenne: {irr_m2_eo:6.0f} kWh/m2", file=f)
 
         if len(gdf_nord) > 0:
             prod_nord = gdf_nord['prod_an_kwh'].sum()
             puiss_nord = gdf_nord['puissance_kwc'].sum()
-            pente_nord = gdf_nord['pente_moy'].mean()
+            pente_nord = gdf_nord['pente_moy_incl'].mean()
             irr_m2_nord = gdf_nord['irr_an_kwh_m2'].mean()
             print(f"Groupe NORD       : {len(gdf_nord)} bâtiments | Pente moyenne: {pente_nord:4.1f}° | Puiss : {puiss_nord:7,.1f} kWc | Prod : {prod_nord:10,.0f} kWh/an | Irradiation moyenne: {irr_m2_nord:6.0f} kWh/m2", file=f)
 
