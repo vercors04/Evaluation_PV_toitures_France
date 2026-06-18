@@ -2,15 +2,14 @@ import os
 import time
 
 from src.tuile.raster import chargerDalle
-from src.tuile.bd_topo import loadBuild
-from src.tuile.donnees_dalle import tileBounds, nomCoord, centreWGS84
+from src.tuile.donnees_dalle import nomCoord, centreWGS84
 from src.geometrie.extract_geom import extractGeom, makeMasques
 from src.geometrie.horizon import compHZ
 from src.irradiance.meteo.irr_fct import chargerTable
 from src.irradiance.irr_calcul import irrPixels
-from src.util.agregation import agregerBatiment
+from src.agregation.agregation import agregerBatiment
 from src.debug import debug_pipeline as debug
-from src.util.autre import hBat
+from src.agregation.select import hBat
 
 
 def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
@@ -24,9 +23,8 @@ def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
 
     @return out : GeoDataFrame ecrit (1 ligne par batiment)
     """
+
     mns_name = os.path.basename(mns_path)
-
-
 
     # ------ Lecture des raster, chargements des masques et donnees ------
     t0 = time.time()

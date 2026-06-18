@@ -24,14 +24,14 @@ def agregerBatiment(df, gdf, hauteur):
     res = pd.DataFrame({
         "irr_an_kwh":          df.groupby("id").energie.sum(),         # toute la toiture
         "irr_an_kwh_orp":      oriente.groupby("id").energie.sum(),    # plat + sud
-        "surf_inclinee_m2":    inc.groupby("id").surf.sum(),
-        "surf_inclinee_or_m2": inc_or.groupby("id").surf.sum(),
+        "surf_incl_m2":        inc.groupby("id").surf.sum(),
+        "surf_incl_or_m2":     inc_or.groupby("id").surf.sum(),
         "surf_plate_m2":       plat.groupby("id").surf.sum(),
-        "pente_moy":           inc.groupby("id").pente.mean(),
+        "pente_moy_incl":           inc.groupby("id").pente.mean(),
         "nb_pixels":           df.groupby("id").size(),
     })
     for s, nom in enumerate(SECTEURS):             # surface inclinee par orientation
-        res[f"surf_{nom}_m2_incl"] = inc[inc.secteur == s].groupby("id").surf.sum()
+        res[f"surf_incl_{nom}_m2"] = inc[inc.secteur == s].groupby("id").surf.sum()
     for t in range(1, 5):                          # production par trimestre (orientee)
         res[f"prod_T{t}_kwh_orp"] = oriente.groupby("id")[f"energie_T{t}"].sum() * PV
 
@@ -40,20 +40,21 @@ def agregerBatiment(df, gdf, hauteur):
 
     res = res.fillna(0.0)                           # mettre des 0 au lieu de NaN
 
-    res["surf_tot_m2"]      = res.surf_inclinee_m2 + res.surf_plate_m2
-    res["puissance_kwc_orp"] = (res.surf_inclinee_or_m2 + res.surf_plate_m2) * TAUX_COUVERTURE * RENDEMENT_MODULE
+    res["surf_tot_m2"]      = res.surf_incl_m2 + res.surf_plate_m2
+    res["puissance_kwc_orp"] = (res.surf_incl_or_m2 + res.surf_plate_m2) * TAUX_COUVERTURE * RENDEMENT_MODULE
     res["prod_an_kwh"]      = res.irr_an_kwh         * PV       # toute la toiture
     res["prod_an_kwh_orp"]   = res.irr_an_kwh_orp * PV          # plat + sud
 
     out = gdf.join(res, how="inner")               # garde les batiments avec >= 1 pixel de toit
     ordre = [
-        "cleabs", "nature", "usage_1", "hauteur", "hauteur_pts", "nombre_d_etages",
+        "cleabs", "nature", "usage_1", "hauteur", "nombre_d_etages",
+        "hauteur_pts",
         "nb_pixels", "surf_tot_m2", "surf_plate_m2",
-        "surf_inclinee_m2", "surf_inclinee_or_m2", "pente_moy",
-        "surf_N_m2_incl", "surf_NE_m2_incl", "surf_E_m2_incl", "surf_SE_m2_incl",
-        "surf_S_m2_incl", "surf_SO_m2_incl", "surf_O_m2_incl", "surf_NO_m2_incl",
-        "irr_an_kwh", "irr_an_kwh_orp",
-        "puissance_kwc_orp", "prod_an_kwh", "prod_an_kwh_orp",
+        "surf_incl_m2", "surf_incl_or_m2", "pente_moy_incl",
+        "surf_incl_N_m2", "surf_incl_NE_m2", "surf_incl_E_m2", "surf_incl_SE_m2",
+        "surf_incl_S_m2", "surf_incl_SO_m2", "surf_incl_O_m2", "surf_incl_NO_m2",
+        "irr_an_kwh", "prod_an_kwh",
+        "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp",
         "prod_T1_kwh_orp", "prod_T2_kwh_orp", "prod_T3_kwh_orp", "prod_T4_kwh_orp",
         "geometry",
     ]

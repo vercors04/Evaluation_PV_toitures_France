@@ -19,16 +19,25 @@
 | Colonne                                                     | Signification                                 | Base spatiale         |
 | ----------------------------------------------------------- | --------------------------------------------- | --------------------- |
 | `cleabs`, `nature`, `usage_1`, `hauteur`, `nombre_d_etages` | Attributs BD TOPO du bâtiment                 | —                     |
+| `hauteur_pts`                                               | Hauteur du bâtiment (p95 du MNH LiDAR)        | Emprise du toit       |
 | `nb_pixels`                                                 | Nombre de pixels de toit                      | Toute la toiture      |
 | `surf_tot_m2`                                               | Surface de toit exploitable                   | Plat + incliné        |
 | `surf_plate_m2`                                             | Surface plate                                 | Plat                  |
-| `surf_inclinee_m2`                                          | Surface inclinée                              | Incliné (toutes dir.) |
-| `surf_inclinee_or_m2`                                       | Surface inclinée orientée                     | Incliné azimut choisis|
+| `surf_incl_m2`                                              | Surface inclinée                              | Incliné (toutes dir.) |
+| `surf_incl_or_m2`                                           | Surface inclinée orientée                     | Incliné azimut choisis|
 | `pente_moy_incl`                                            | Pente moyenne des pans inclinés               | Incliné (toutes dir.) |
-| `surf_N_m2_incl` … `surf_NO_m2_incl`                        | Surface inclinée par orientation (8 secteurs) | Incliné (toutes dir.) |
+| `surf_incl_N_m2` … `surf_incl_NO_m2`                        | Surface inclinée par orientation (8 secteurs) | Incliné (toutes dir.) |
 | `irr_an_kwh`                                                | Irradiation reçue / an                        | Toute la toiture      |
 | `prod_an_kwh`                                               | Production PV / an                            | Toute la toiture      |
 | `irr_an_kwh_orp`                                            | Irradiation reçue / an                        | Plat + orienté        |
 | `puissance_kwc_orp`                                         | Puissance crête installable                   | Plat + orienté        |
 | `prod_an_kwh_orp`                                           | Production PV / an                            | Plat + orienté        |
 | `prod_T1_kwh_orp` … `prod_T4_kwh_orp`                       | Production PV par trimestre                   | Plat + orienté        |
+
+
+## Convention de nommage
+
+- **sans suffixe** = toute la toiture (ex. `irr_an_kwh`, `prod_an_kwh`)
+- **`_incl`** = incliné, toutes orientations (ex. `surf_incl_m2`, `surf_incl_N_m2`, `pente_moy_incl`)
+- **`_or`** = incliné orienté seul, sans le plat (ex. `surf_incl_or_m2`)
+- **`_orp`** = orienté + plat = base de production (ex. `irr_an_kwh_orp`, `puissance_kwc_orp`, `prod_an_kwh_orp`, `prod_T*_kwh_orp`)

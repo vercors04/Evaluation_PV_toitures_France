@@ -22,8 +22,7 @@ def batiments(echelle, nom_zone, code_dep=None):
     elif echelle == "region":
         cql_filter = f"nom_officiel ILIKE '{nom_zone}'"
     else:
-        print("Erreur : Échelle non valide.")
-        return None
+        raise ValueError(f"echelle invalide : {echelle}")
     
     params={
         "SERVICE": "WFS", 
@@ -73,14 +72,19 @@ def batiments(echelle, nom_zone, code_dep=None):
         if len(geodf)<limit:
             break
 
-        start_index+=2000
+        start_index+=limit
 
     if liste_geodf:
         geodf_complet=pd.concat(liste_geodf,ignore_index=True)
         gdf_final = geodf_complet[geodf_complet.intersects(geom_echelle)]
+        # gdf_final = gdf_final[
+        #              (gdf_final['etat_de_l_objet'] == 'En service') &
+        #              (gdf_final['construction_legere'] == False)
+        #         ]
 
-        print(f"{len(gdf_final)} bâtiments trouvés")
-        
+        gdf_final = (gdf_final[['cleabs', 'nature', 'usage_1', 'hauteur',
+                                        'nombre_d_etages', 'geometry']].reset_index(drop=True)) .to_crs(2154)
+
+        print(f"{len(gdf_final)} batiments retenus")
         return gdf_final
-    else:
-        return None
+    return None

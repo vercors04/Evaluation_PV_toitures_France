@@ -69,31 +69,3 @@ def liste_telechargement(dictionnaire_resultats):
     print(f"{len(liste_paires)} paires trouvées")
     return liste_paires
 
-
-# def telecharger_puis_supprimer(nom_mnt, url_mnt, nom_mns, url_mns):
-#     """
-#     Télécharge simultanément une paire de dalles MNT et MNS via multithreading, puis les supprime.
-#     ---------------------------------------------------------------------------------------
-#     @param[in]  nom_mnt : Nom cible pour le fichier MNT.
-#     @param[in]  url_mnt : Lien de téléchargement de la dalle MNT.
-#     @param[in]  nom_mns : Nom cible pour le fichier MNS.
-#     @param[in]  url_mns : Lien de téléchargement de la dalle MNS.
-
-#     @param[out] None    : N'a pas de valeur de retour, effectue uniquement des opérations système d'E/S.
-#     """
-#     print('début test sur une dalle')
-
-#     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-#         future_mnt = executor.submit(telecharger_fichier, url_mnt,nom_mnt)
-#         future_mns = executor.submit(telecharger_fichier, url_mns,nom_mns)
-    
-#         fichier_mnt = future_mnt.result()
-#         fichier_mns = future_mns.result()
-
-#         print('paire telechargée passage à la suppression')
-
-#         try:
-#             os.remove(fichier_mns)
-#             os.remove(fichier_mnt)
-#         except OSError as e:
-#             print(f'Erreur pendant la suppression{e}')

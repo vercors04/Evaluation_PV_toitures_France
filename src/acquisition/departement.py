@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 import requests
 import shapely.ops
-from config import DIR_GEOJSON
+from src.config import DIR_GEOJSON
 import os
 
 

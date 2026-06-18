@@ -2,7 +2,7 @@ import geopandas as gpd
 import requests
 import shapely.ops
 import os
-from config import DIR_GEOJSON
+from src.config import DIR_GEOJSON
 
 def commune(nom_commune,num_departement):
 
