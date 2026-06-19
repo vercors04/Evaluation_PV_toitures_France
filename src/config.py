@@ -17,9 +17,9 @@ DIR_GEOJSON = os.path.normpath("data/raw/TEST/geojson")
 URL     = "https://re.jrc.ec.europa.eu/api/v5_3/"    # PVGIS 5.3 (SARAH-3, 2005-2023)
 DOSSIER = "data/tables"                              # un fichier par cellule meteo
 PAS     = 0.05                                       # pas de la grille meteo (deg)
-PAUSE   = 1.0                                        # temps entre requete pvgis
-LAT_MIN, LAT_MAX = 46.30, 46.60                      # emprise des cellules a construire
-LON_MIN, LON_MAX = 0.05,  0.40 
+PAUSE   = 0.2                                        # temps entre requete pvgis
+LAT_MIN, LAT_MAX = 46.30, 46.70                      # emprise des cellules a construire
+LON_MIN, LON_MAX = 0.05,  0.50 
 
 # grille table meteo
 ALPHAS = np.arange(0, 360, 15)    # orientations testees (deg, 0=N, 90=E)

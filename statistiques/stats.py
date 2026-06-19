@@ -223,4 +223,4 @@ def main(fichier):
 
 
 if __name__ == "__main__":
-    main('Lusignan86.gpkg')
+    main('Poitiers86.gpkg')

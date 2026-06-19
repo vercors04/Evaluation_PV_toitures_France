@@ -7,7 +7,7 @@ from src.agregation.agregation import merger_cleabs
 from src.agregation.select import filtrer
 from src.tuile.donnees_dalle import tileBounds
 from src.acquisition.batiments import batiments
-from src.acquisition.adresse import adresse_vers_coords
+from src.acquisition.adresse import adresseCoords
 
 import os
 import concurrent.futures
@@ -40,22 +40,22 @@ def main():
 
     if choix=="0":
         nom_zone=input('Entrez une adresse :').strip()
-        dictionnaire_resultats=adresse_vers_coords(nom_zone)
+        dictionnaire_resultats=adresseCoords(nom_zone)
         echelle="adresse"
 
-    if choix == "1":
-        nom_zone=input("Entrez une ville ou une commune : ").strip().replace("'", "''").replace(" ", "_") 
+    elif choix == "1":
+        nom_zone=input("Entrez une ville ou une commune : ").strip()
         code_dep = input("Entrez le numéro de département : ").strip()
         dictionnaire_resultats = commune(nom_zone, code_dep)
         echelle="commune"
 
     elif choix == "2":
-        nom_zone = input("Entrez un département ou son numéro : ").strip().replace("'", "''").replace(" ", "_") 
+        nom_zone = input("Entrez un département ou son numéro : ").strip()
         dictionnaire_resultats = departement(nom_zone)
         echelle="departement"
    
     elif choix == "3":
-        nom_zone=input("Entrez le nom d'une région: ").strip().replace("'", "''").replace(" ", "_") 
+        nom_zone=input("Entrez le nom d'une région: ").strip()
         dictionnaire_resultats = region(nom_zone)
         echelle="region"
 
@@ -71,7 +71,7 @@ def main():
         print("Pas de bat dans cette region / mal orthographie"); return None
     
 
-
+    nom_zone=nom_zone.replace("'", "''").replace(" ", "_") 
     gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}{code_dep or ''}.gpkg")
 
     

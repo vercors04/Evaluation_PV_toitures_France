@@ -76,7 +76,8 @@ def telecharger(lat, lon):
         raddatabase="PVGIS-SARAH3",
         components=True, surface_tilt=0, surface_azimuth=0,
         usehorizon=False,                # a voir si on prend cet horizon en +
-        url=URL, map_variables=True)
+        url=URL, map_variables=True,
+        timeout=120)                     # defaut 30s -> trop court (le serveur PVGIS traine souvent)
     df = out[0]
     return df
 

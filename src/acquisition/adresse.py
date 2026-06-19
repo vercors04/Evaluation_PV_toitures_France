@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 import requests
 
-def adresse_vers_coords(nom_zone: str):
+def adresseCoords(nom_zone: str):
     """
     Géocode une adresse textuelle pour identifier et récupérer les dalles LiDAR HD associées.
     ---------------------------------------------------------------------------------------
@@ -43,5 +43,4 @@ def adresse_vers_coords(nom_zone: str):
             else :
                 resultats_dalles[type_couche]=gdf
     
-    print(resultats_dalles)
     return resultats_dalles

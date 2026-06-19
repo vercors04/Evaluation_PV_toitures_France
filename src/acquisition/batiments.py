@@ -1,6 +1,7 @@
 import geopandas as gpd
 import requests
 import pandas as pd
+from shapely.geometry import box
 
 def batiments(echelle, nom_zone, code_dep=None):
     """
@@ -14,36 +15,46 @@ def batiments(echelle, nom_zone, code_dep=None):
     """
 
     wfs_url = "https://data.geopf.fr/wfs/ows"
+
+    if echelle == "adresse":
+        r = requests.get("https://data.geopf.fr/geocodage/search",
+                         params={"q": nom_zone, "limit": 1})
+        lon, lat = r.json()["features"][0]["geometry"]["coordinates"]
+        minx, miny, maxx, maxy = lon-0.015, lat-0.015, lon+0.015, lat+0.015
+        geom_echelle = box(minx, miny, maxx, maxy)
     
-    if echelle == "commune":
+    elif echelle == "commune":
         cql_filter = f"nom_officiel ILIKE '{nom_zone}' AND code_insee_du_departement = '{code_dep}'"
+
     elif echelle == "departement":
         cql_filter = f"nom_officiel ILIKE '{nom_zone}' OR code_insee = '{nom_zone}'"
+
     elif echelle == "region":
         cql_filter = f"nom_officiel ILIKE '{nom_zone}'"
+
+
     else:
         raise ValueError(f"echelle invalide : {echelle}")
     
-    params={
-        "SERVICE": "WFS", 
-        "VERSION": "1.0.0",
-        "REQUEST": "GetFeature",
-        "TYPENAME": f"BDTOPO_V3:{echelle}",
-        "OUTPUTFORMAT": "application/json",
-        "CQL_FILTER": cql_filter
-    }
+    if echelle != "adresse":
+        params={
+            "SERVICE": "WFS", 
+            "VERSION": "1.0.0",
+            "REQUEST": "GetFeature",
+            "TYPENAME": f"BDTOPO_V3:{echelle}",
+            "OUTPUTFORMAT": "application/json",
+            "CQL_FILTER": cql_filter
+        }
 
-    reponse = requests.get(wfs_url, params=params)
-    
-    gdf = gpd.read_file(reponse.text)
-    if gdf.empty:
-        print('Pas de territoire trouvé')
-        return None
-    
-    geom_echelle = gdf.geometry.iloc[0]
-    
 
-    minx, miny, maxx, maxy = gdf.total_bounds
+        gdf = gpd.read_file(requests.get(wfs_url, params=params).text)
+        if gdf.empty:
+            print('Pas de territoire trouvé')
+            return None
+        
+        geom_echelle = gdf.geometry.iloc[0]
+        minx, miny, maxx, maxy = gdf.total_bounds
+
 
     limit=2000
     start_index=0
