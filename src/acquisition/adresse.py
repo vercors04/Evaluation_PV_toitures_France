@@ -1,33 +1,47 @@
 import geopandas as gpd
 import pandas as pd
 import requests
-import shapely.ops
 
-def adresse():
-    numero=input("Numéro: ").strip().replace("'", "''")
-    voie=input("Rue (sans accent): ").strip().replace("'", "''")
-    commune=input("Commune ou ville: ").strip().replace("'", "''")
+def adresse_vers_coords(nom_zone: str):
+    """
+    Géocode une adresse textuelle pour identifier et récupérer les dalles LiDAR HD associées.
+    ---------------------------------------------------------------------------------------
+    @param[in] nom_zone          : L'adresse textuelle complète saisie par l'utilisateur 
+                                   (ex: "107 boulevard de vitré rennes")
     
-    url_wfs="https://data.geopf.fr/wfs/ows"
+    @param[out] resultats_dalles : Dictionnaire contenant deux clés ('MNS' et 'MNT'), associées 
+                                   chacune à un GeoDataFrame des métadonnées de la dalle de 1 km² 
+                                   (ou None/vide si l'adresse est introuvable)
+    """
+    r = requests.get(
+        "https://data.geopf.fr/geocodage/search",
+        params={"q": nom_zone, "limit": 1}
+    )
+    lon, lat = r.json()["features"][0]["geometry"]["coordinates"]
+    print(f"lon={lon}, lat={lat}")
 
-    params={
-        "SERVICE": "WFS", 
-        "VERSION": "2.0.0",
-        "REQUEST": "GetFeature",
-        "TYPENAME": "BAN.DATA.GOUV:ban",
-        "OUTPUTFORMAT": "application/json",
-        "CQL_FILTER": f"numero='{numero}' AND nom_voie ILIKE '%{voie}%' AND nom_commune ILIKE '%{commune}%'"
-        }
+    resultats_dalles={}
+    url_mn="https://data.geopf.fr/wfs/ows"
+    if lon and lat :
+        lon_min,lon_max=lon - 0.0005, lon + 0.0005
+        lat_min,lat_max=lat - 0.0005, lat + 0.0005
+        for type_couche in ['MNS','MNT']:
+            args={
+                "SERVICE": "WFS",
+                "VERSION": "2.0.0",
+                "REQUEST": "GetFeature",
+                "TYPENAME": f"IGNF_{type_couche}-LIDAR-HD:dalle",
+                "OUTPUTFORMAT": "application/json",
+                "CQL_FILTER": f"BBOX(geom,{lat_min},{lon_min},{lat_max},{lon_max})"
+                }
+        
+            reponse=requests.get(url_mn,params=args)
+            gdf=gpd.read_file(reponse.text)
+            if gdf.empty:
+                print("erreur adresse non valide")
+                return None
+            else :
+                resultats_dalles[type_couche]=gdf
     
-    reponse=requests.get(url_wfs,params=params)
-   
-    gdf=gpd.read_file(reponse.text)
-    
-    if gdf.empty:
-        print("Aucune adresse trouvée")
-        return None
-
-    print(gdf)
-
-if __name__ == "__main__":
-    adresse()
+    print(resultats_dalles)
+    return resultats_dalles

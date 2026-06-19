@@ -7,6 +7,7 @@ from src.agregation.agregation import merger_cleabs
 from src.agregation.select import filtrer
 from src.tuile.donnees_dalle import tileBounds
 from src.acquisition.batiments import batiments
+from src.acquisition.adresse import adresse_vers_coords
 
 import os
 import concurrent.futures
@@ -26,16 +27,21 @@ def main():
 
 
     print("Choix de l'échelle territoriale:")
+    print("0 : Adresse")
     print("1 : Commune ou Ville")
     print("2 : Département")
     print("3 : Région")
-    choix=input("Choisissez l'échelle (1,2 ou 3) :").strip()
+    choix=input("Choisissez l'échelle (0,1,2 ou 3) :").strip()
 
     dictionnaire_resultats={}
     echelle=""
     nom_zone=""
     code_dep=None
 
+    if choix=="0":
+        nom_zone=input('Entrez une adresse :').strip()
+        dictionnaire_resultats=adresse_vers_coords(nom_zone)
+        echelle="adresse"
 
     if choix == "1":
         nom_zone=input("Entrez une ville ou une commune : ").strip().replace("'", "''").replace(" ", "_") 
@@ -54,7 +60,7 @@ def main():
         echelle="region"
 
     else:
-        print('Choisissez entre 1,2 et 3.')
+        print('Choisissez entre 0,1,2 et 3.')
         return None
     
     t0 = time.time()
