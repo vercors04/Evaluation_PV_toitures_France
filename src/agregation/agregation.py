@@ -1,4 +1,5 @@
 import pandas as pd
+import geopandas as gpd
 
 from src.config import SECTEURS, TAUX_COUVERTURE, RENDEMENT_MODULE, PERFORMANCE_RATIO
 
@@ -9,7 +10,7 @@ def agregerBatiment(df, gdf, hauteur):
     """
     Agrege les pixels par batiment, applique le modele PV, joint a la BD TOPO.
     Production / puissance : base "orientee" = plat + incline sud (pans nord exclus).
-    Surfaces descriptives (surf_inclinee_m2, secteurs, pente_moy) : toutes orientations.
+    Surfaces descriptives (surf_incl_m2, secteurs, pente_moy_incl) : toutes orientations.
     --------
     @param[in] df  : sortie de irrPixels (1 ligne par pixel)
     @param[in] gdf : GeoDataFrame des batiments (index 0..n-1 = df.id)
@@ -67,3 +68,21 @@ def merger_cleabs(gdf):
     return (gdf.sort_values("nb_pixels", ascending=False)
                .drop_duplicates("cleabs")
                .reset_index(drop=True))
+
+
+def mergeCleabs(gdf):
+    """
+    Recolle les morceaux d'un meme batiment a cheval sur 2 dalles (meme cleabs) :
+    somme les grandeurs additives, moyenne la pente, garde la hauteur max.
+    --------
+    @param[in] gdf : sortie de agregerBatiment (peut avoir plusieurs lignes par cleabs)
+
+    @return GeoDataFrame : 1 ligne par cleabs (morceaux recolles)
+    """
+    agg = {c: "sum" for c in gdf.columns                          # surfaces, energies, prod, puissance, nb_pixels
+           if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c == "nb_pixels"}
+    agg.update(pente_moy_incl="mean", hauteur_pts="max",         # pente moyenne, hauteur la plus haute
+               nature="first", usage_1="first", hauteur="first", # attributs BD TOPO (identiques)
+               nombre_d_etages="first", geometry="first")
+    out = gdf.groupby("cleabs", as_index=False).agg(agg)
+    return gpd.GeoDataFrame(out, geometry="geometry", crs=gdf.crs)

@@ -3,12 +3,15 @@ import os, time, requests
 
 def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST', n_essais=4, pause=3):
     """
-    Télécharge un fichier distant en continu (stream) et le sauvegarde localement.
-    ---------------------------------------------------------------------------------------
-    @param[in]  url          : Lien HTTP(S) de téléchargement du fichier.
-    @param[in]  dossier_dest : Chemin du dossier cible (créé automatiquement si inexistant).
+    Telecharge un fichier en streaming, avec retry + backoff.
+    --------
+    @param[in] url          : lien HTTP(S) du fichier
+    @param[in] nom_fichier  : nom du fichier sur le disque
+    @param[in] dossier_dest : dossier cible (cree si absent)
+    @param[in] n_essais     : nombre de tentatives avant abandon
+    @param[in] pause        : pause de base entre essais (s), croissante
 
-    @param[out] chemin       : Chaîne de caractères (str), chemin absolu ou relatif du fichier téléchargé.
+    @return chemin : chemin local du fichier (leve RuntimeError apres n_essais echecs)
     """
     os.makedirs(dossier_dest, exist_ok=True)
     chemin = os.path.join(dossier_dest, nom_fichier)
@@ -36,20 +39,11 @@ def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST', n_essais
 def liste_telechargement(dictionnaire_resultats):
 
     """
-    Apparie les dalles MNT et MNS d'une même zone en se basant sur leur identifiant pour préparer le téléchargement.
-    ---------------------------------------------------------------------------------------
-    @param[in]  dictionnaire_resultats : Dictionnaire contenant les métadonnées géographiques :
-                                         {
-                                           'MNT' : GeoDataFrame des dalles MNT,
-                                           'MNS' : GeoDataFrame des dalles MNS
-                                         }
+    Apparie les dalles MNT et MNS (par identifiant) en paires a telecharger.
+    --------
+    @param[in] dictionnaire_resultats : dict {'MNT': GeoDataFrame, 'MNS': GeoDataFrame} (colonnes name, url)
 
-    @param[out] liste_paires           : Liste de tuples, un par paire de dalles appariées :
-                                         [
-                                           (nom_mnt, url_mnt, nom_mns, url_mns),
-                                           ...
-                                         ]
-                                         Retourne une liste vide si des données sont manquantes.
+    @return liste de tuples (nom_mnt, url_mnt, nom_mns, url_mns) ; [] si MNT ou MNS manquant
     """
 
     if 'MNT' not in dictionnaire_resultats or 'MNS' not in dictionnaire_resultats:

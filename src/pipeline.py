@@ -14,14 +14,13 @@ from src.agregation.select import hBat
 
 def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
     """
-    Traite une dalle : BD TOPO -> geometrie -> masques -> horizon -> irradiance
-    -> agregation par batiment -> ecriture du GeoPackage.
+    Traite une dalle : geometrie -> masques -> horizon -> irradiance -> agregation par batiment.
     --------
     @param[in] mns_path, mnt_path : chemins des rasters MNS / MNT IGN
-    @param[in] gpkg_bdtopo        : chemin du GeoPackage BD TOPO
+    @param[in] gdf                : GeoDataFrame des batiments de la dalle (Lambert 93)
     @param[in] debug_dir          : si fourni, exporte les rasters de debug
 
-    @return out : GeoDataFrame ecrit (1 ligne par batiment)
+    @return out : GeoDataFrame, 1 ligne par batiment
     """
 
     mns_name = os.path.basename(mns_path)

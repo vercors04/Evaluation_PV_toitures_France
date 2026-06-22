@@ -1,105 +1,45 @@
-import geopandas as gpd
-import requests
-import pandas as pd
-from shapely.geometry import box
+import requests, geopandas as gpd, pandas as pd
 
-def batiments(echelle, nom_zone, code_dep=None):
+WFS = "https://data.geopf.fr/wfs/ows"
+NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']
+
+def batiments(polygone):
     """
-    Interroge l'API WFS IGN pour récupérer les bâtiments selon l'échelle territoriale.
-    ---------------------------------------------------------------------------------------
-    @param[in] echelle       : 'commune', 'departement', ou 'region'
-    @param[in] nom_recherche : Nom du territoire (ex: "Cloué", "Vienne", "Bretagne")
-    @param[in] code_dep      : Optionnel, requis uniquement pour différencier les communes homonymes
-    
-    @param[out] gdf_final    : GeoDataFrame contenant les bâtiments découpés sur le territoire
+    Batiments BD TOPO exploitables dans la zone, via le WFS IGN (pagine).
+    Filtre : en service, non legers, nature residentielle/industrielle (NATURE_OK).
+    --------
+    @param[in] polygone : emprise de la zone (shapely, WGS84)
+
+    @return gdf : GeoDataFrame en Lambert 93 (EPSG:2154), colonnes
+                  cleabs, nature, usage_1, hauteur, nombre_d_etages, geometry ; None si vide
     """
-
-    wfs_url = "https://data.geopf.fr/wfs/ows"
-
-    if echelle == "adresse":
-        r = requests.get("https://data.geopf.fr/geocodage/search",
-                         params={"q": nom_zone, "limit": 1})
-        lon, lat = r.json()["features"][0]["geometry"]["coordinates"]
-        minx, miny, maxx, maxy = lon-0.015, lat-0.015, lon+0.015, lat+0.015
-        geom_echelle = box(minx, miny, maxx, maxy)
-    
-    elif echelle == "commune":
-        cql_filter = f"nom_officiel ILIKE '{nom_zone}' AND code_insee_du_departement = '{code_dep}'"
-
-    elif echelle == "departement":
-        cql_filter = f"nom_officiel ILIKE '{nom_zone}' OR code_insee = '{nom_zone}'"
-
-    elif echelle == "region":
-        cql_filter = f"nom_officiel ILIKE '{nom_zone}'"
-
-
-    else:
-        raise ValueError(f"echelle invalide : {echelle}")
-    
-    if echelle != "adresse":
-        params={
-            "SERVICE": "WFS", 
-            "VERSION": "1.0.0",
-            "REQUEST": "GetFeature",
-            "TYPENAME": f"BDTOPO_V3:{echelle}",
-            "OUTPUTFORMAT": "application/json",
-            "CQL_FILTER": cql_filter
-        }
-
-
-        gdf = gpd.read_file(requests.get(wfs_url, params=params).text)
-        if gdf.empty:
-            print('Pas de territoire trouvé')
-            return None
-        
-        geom_echelle = gdf.geometry.iloc[0]
-        minx, miny, maxx, maxy = gdf.total_bounds
-
-
-    limit=2000
-    start_index=0
-    liste_geodf=[]
-
+    minx, miny, maxx, maxy = polygone.bounds
+    morceaux, start = [], 0
     while True:
-        args={
-            "SERVICE": "WFS", 
-            "VERSION": "2.0.0", 
+        params = {
+            "SERVICE": "WFS",
+            "VERSION": "2.0.0",
             "REQUEST": "GetFeature",
-            "TYPENAME": "BDTOPO_V3:batiment", 
+            "TYPENAME": "BDTOPO_V3:batiment",
             "OUTPUTFORMAT": "application/json",
             "CQL_FILTER": f"BBOX(geometrie,{miny},{minx},{maxy},{maxx})",
-            "COUNT": limit,
-            "STARTINDEX": start_index
+            "COUNT": 2000,
+            "STARTINDEX": start,
         }
-        reponses = requests.get(wfs_url, params=args)
-        
-        geodf = gpd.read_file(reponses.text)
-
-        if geodf.empty:
+        g = gpd.read_file(requests.get(WFS, params=params).text)
+        if g.empty:
             break
-
-        liste_geodf.append(geodf)
-
-        if len(geodf)<limit:
+        morceaux.append(g)
+        if len(g) < 2000:
             break
+        start += 2000
 
-        start_index+=limit
-
-    if liste_geodf:
-        geodf_complet=pd.concat(liste_geodf,ignore_index=True)
-        gdf_final = geodf_complet[geodf_complet.intersects(geom_echelle)]
-        NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']
-
-        gdf_final = gdf_final[
-            (gdf_final['etat_de_l_objet'] == 'En service') &
-            (gdf_final['construction_legere'] == False) &
-            (gdf_final['nature'].isin(NATURE_OK))
-        ]
-
-
-        gdf_final = (gdf_final[['cleabs', 'nature', 'usage_1', 'hauteur',
-                                        'nombre_d_etages', 'geometry']].reset_index(drop=True)) .to_crs(2154)
-
-        print(f"{len(gdf_final)} batiments retenus")
-        return gdf_final
-    return None
+    if not morceaux:
+        return None
+    tout = pd.concat(morceaux, ignore_index=True)
+    tout = tout[tout.geometry.representative_point().within(polygone)]
+    tout = tout[(tout['etat_de_l_objet'] == "En service")
+                & (tout['construction_legere'] == False)
+                & tout['nature'].isin(NATURE_OK)]
+    return (tout[['cleabs', 'nature', 'usage_1', 'hauteur', 'nombre_d_etages', 'geometry']]
+            .reset_index(drop=True).to_crs(2154))

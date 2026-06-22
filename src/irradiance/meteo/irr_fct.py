@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import pvlib
-from src.config import *
+from src.config import ALPHAS, BETAS, ALBEDO, DOSSIER, PAS
 
 
 
@@ -110,7 +110,13 @@ def chargerTable(lat, lon):
     lo = round(round(lon / PAS) * PAS, 2)
 
     if (la, lo) not in _cache:
-        d = np.load(cheminTable(la, lo))
+        chemin = cheminTable(la, lo)
+        if not os.path.exists(chemin):
+            raise FileNotFoundError(
+                f"Table meteo absente pour la cellule ({la}, {lo}) -> {chemin}. "
+                f"Construis-la (irr_bounds) ou elargis LAT/LON_MIN/MAX dans config.")
+        d = np.load(chemin)
+
         _cache[(la, lo)] = (d["B"], d["D"], d["SAZ"], d["SEL"])
 
     return _cache[(la, lo)]
