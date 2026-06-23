@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 560 320"
+   role="img"
+   font-family="system-ui, -apple-system, sans-serif"
+   version="1.1"
+   id="svg27"
+   sodipodi:docname="schema_temps.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview27"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.546875"
+     inkscape:cx="279.91919"
+     inkscape:cy="160"
+     inkscape:window-width="1366"
+     inkscape:window-height="697"
+     inkscape:window-x="-8"
+     inkscape:window-y="239"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg27" />
+  <title
+     id="title1">Taille de cellule et nombre de cellules</title>
+  <desc
+     id="desc1">Une meme region decoupee en cellules de taille s (16 cellules) puis de taille 2s (4 cellules), chaque cellule ayant un point en son centre.</desc>
+  <style
+     id="style1">
+    .lbl{fill:#2C2C2A;font-size:14px;}
+    .reg{fill:none;stroke:#B4B2A9;stroke-width:1.2;}
+    .out{fill:none;stroke:#2C2C2A;stroke-width:2;}
+    .ar{fill:#378ADD;font-size:14px;font-weight:700;}
+  </style>
+  <!-- region gauche : taille s -->
+  <rect
+     class="out"
+     x="30"
+     y="50"
+     width="192"
+     height="192"
+     id="rect1" />
+  <g
+     class="reg"
+     id="g6">
+    <line
+       x1="78"
+       y1="50"
+       x2="78"
+       y2="242"
+       id="line1" />
+    <line
+       x1="126"
+       y1="50"
+       x2="126"
+       y2="242"
+       id="line2" />
+    <line
+       x1="174"
+       y1="50"
+       x2="174"
+       y2="242"
+       id="line3" />
+    <line
+       x1="30"
+       y1="98"
+       x2="222"
+       y2="98"
+       id="line4" />
+    <line
+       x1="30"
+       y1="146"
+       x2="222"
+       y2="146"
+       id="line5" />
+    <line
+       x1="30"
+       y1="194"
+       x2="222"
+       y2="194"
+       id="line6" />
+  </g>
+  <g
+     fill="#378ADD"
+     id="g21">
+    <circle
+       cx="54"
+       cy="74"
+       r="4"
+       id="circle6" />
+    <circle
+       cx="102"
+       cy="74"
+       r="4"
+       id="circle7" />
+    <circle
+       cx="150"
+       cy="74"
+       r="4"
+       id="circle8" />
+    <circle
+       cx="198"
+       cy="74"
+       r="4"
+       id="circle9" />
+    <circle
+       cx="54"
+       cy="122"
+       r="4"
+       id="circle10" />
+    <circle
+       cx="102"
+       cy="122"
+       r="4"
+       id="circle11" />
+    <circle
+       cx="150"
+       cy="122"
+       r="4"
+       id="circle12" />
+    <circle
+       cx="198"
+       cy="122"
+       r="4"
+       id="circle13" />
+    <circle
+       cx="54"
+       cy="170"
+       r="4"
+       id="circle14" />
+    <circle
+       cx="102"
+       cy="170"
+       r="4"
+       id="circle15" />
+    <circle
+       cx="150"
+       cy="170"
+       r="4"
+       id="circle16" />
+    <circle
+       cx="198"
+       cy="170"
+       r="4"
+       id="circle17" />
+    <circle
+       cx="54"
+       cy="218"
+       r="4"
+       id="circle18" />
+    <circle
+       cx="102"
+       cy="218"
+       r="4"
+       id="circle19" />
+    <circle
+       cx="150"
+       cy="218"
+       r="4"
+       id="circle20" />
+    <circle
+       cx="198"
+       cy="218"
+       r="4"
+       id="circle21" />
+  </g>
+  <text
+     class="lbl"
+     x="126"
+     y="266"
+     text-anchor="middle"
+     id="text21">16 cellules</text>
+  <!-- fleche -->
+  <line
+     x1="232"
+     y1="146"
+     x2="318"
+     y2="146"
+     stroke="#378ADD"
+     stroke-width="2"
+     marker-end="url(#a)"
+     id="line21" />
+  <defs
+     id="defs21">
+    <marker
+       id="a"
+       markerWidth="10"
+       markerHeight="10"
+       refX="7"
+       refY="4.5"
+       orient="auto">
+      <path
+         d="M0,0 L9,4.5 L0,9 z"
+         fill="#378ADD"
+         id="path21" />
+    </marker>
+  </defs>
+  <text
+     class="ar"
+     x="275"
+     y="136"
+     text-anchor="middle"
+     id="text22">× 2</text>
+  <!-- region droite : taille 2s -->
+  <rect
+     class="out"
+     x="330"
+     y="50"
+     width="192"
+     height="192"
+     id="rect23" />
+  <g
+     class="reg"
+     id="g24">
+    <line
+       x1="426"
+       y1="50"
+       x2="426"
+       y2="242"
+       id="line23" />
+    <line
+       x1="330"
+       y1="146"
+       x2="522"
+       y2="146"
+       id="line24" />
+  </g>
+  <g
+     fill="#378ADD"
+     id="g27">
+    <circle
+       cx="378"
+       cy="98"
+       r="4.5"
+       id="circle24" />
+    <circle
+       cx="474"
+       cy="98"
+       r="4.5"
+       id="circle25" />
+    <circle
+       cx="378"
+       cy="194"
+       r="4.5"
+       id="circle26" />
+    <circle
+       cx="474"
+       cy="194"
+       r="4.5"
+       id="circle27" />
+  </g>
+  <text
+     class="lbl"
+     x="426"
+     y="266"
+     text-anchor="middle"
+     id="text27">4 cellules</text>
+</svg>

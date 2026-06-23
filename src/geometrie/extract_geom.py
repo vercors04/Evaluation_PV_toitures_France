@@ -2,7 +2,7 @@ import numpy as np
 from rasterio.features import rasterize
 from scipy.ndimage import binary_erosion
 
-from src.config import *
+from src.config import BUFFER, MNH_MIN, PENTE_PLAT, PENTE_MAX, AZ_MIN, AZ_MAX
 
 
 def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
@@ -27,9 +27,9 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
 
     pts_ok = (masque_bat > 0) & (mnh >= mnh_min) & np.isfinite(mns) & np.isfinite(mnt)
 
-    dz_dy, dz_dx = np.gradient(mns, meta["resolution"])
-    pente  = np.degrees(np.arctan(np.hypot(dz_dx, dz_dy)))
-    aspect = np.degrees(np.arctan2(-dz_dx, dz_dy)) % 360
+    dz_dligne, dz_dcol = np.gradient(mns, meta["resolution"])
+    pente  = np.degrees(np.arctan(np.hypot(dz_dcol, dz_dligne)))
+    aspect = np.degrees(np.arctan2(-dz_dcol, dz_dligne)) % 360
 
     # on enleve les bords de toit (a mentionner dans le rapport)
     valid = binary_erosion(pts_ok, np.ones((3, 3), dtype=bool))

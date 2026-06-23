@@ -48,13 +48,14 @@ def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
     B, D, SAZ, SEL = chargerTable(lat, lon)
     df  = irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
                     meta["resolution"], B, D, SAZ, SEL, horizon)
-    
+    print(f"Irradiance : {time.time()-t0:.1f}s ")
 
 
     # ------ agregation par bat + ecriture ------
+    t0 = time.time()
     hauteur = hBat (mnh, masque_bat, 0.95)
     out = agregerBatiment(df, gdf, hauteur)
-    print(f"Irradiance : {time.time()-t0:.1f}s ")
+    print(f"Agregation batiments : {time.time()-t0:.1f}s ")
 
 
 

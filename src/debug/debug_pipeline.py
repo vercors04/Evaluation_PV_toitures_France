@@ -29,9 +29,9 @@ def exportHorizon(horizon, masque_toiture, meta, out_dir, nodata=-9999.0):
     """
     os.makedirs(out_dir, exist_ok=True)
     H, W = masque_toiture.shape
-    x, y = np.where(masque_toiture)              # memes pixels / ordre que compHZ
+    ligne, col = np.where(masque_toiture)        # memes pixels / ordre que compHZ
     step = 360 // horizon.shape[1]
     for d in range(horizon.shape[1]):
         grid = np.full((H, W), nodata, np.float32)
-        grid[x, y] = horizon[:, d]               # on re-disperse la colonne d sur la grille
+        grid[ligne, col] = horizon[:, d]         # on re-disperse la colonne d sur la grille
         ecrireGeotiff(grid, meta, os.path.join(out_dir, f"horizon_{d * step:03d}.tif"))

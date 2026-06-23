@@ -3,7 +3,8 @@ import time
 import numpy as np
 
 from src.irradiance.meteo.irr_fct import telecharger, transpAgr, cheminTable
-from src.config import *
+from src.config import (DOSSIER, PAS, PAUSE, LAT_MIN, LAT_MAX,
+                        LON_MIN, LON_MAX, ALPHAS, BETAS)
 
 
 

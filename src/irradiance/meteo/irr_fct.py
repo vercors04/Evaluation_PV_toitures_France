@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import pvlib
-from src.config import ALPHAS, BETAS, ALBEDO, DOSSIER, PAS
+from src.config import ALPHAS, BETAS, ALBEDO, DOSSIER, PAS, URL
 
 
 

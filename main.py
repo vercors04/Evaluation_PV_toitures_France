@@ -55,7 +55,7 @@ def main():
         return None
     
     t0 = time.time()
-    polygone = zone(echelle, nom_zone, code_dep)
+    polygone = zone(echelle, nom_zone.replace("'", "''"), code_dep)
     if polygone is None:
         print("zone introuvable"); return None
 
@@ -63,6 +63,7 @@ def main():
     if gdf_bati is None or gdf_bati.empty:
         print("aucun batiment"); return None
 
+    print(f"Temps batiments : {time.time()-t0:.1f}s")
 
     nom_zone=nom_zone.replace("'", "''").replace(" ", "_").replace(",", "") 
 
