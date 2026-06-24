@@ -15,10 +15,10 @@ DIR_GEOJSON = os.path.normpath("data/raw/TEST/geojson")
 # construction table meteo
 URL     = "https://re.jrc.ec.europa.eu/api/v5_3/"    # PVGIS 5.3 (SARAH-3, 2005-2023)
 DOSSIER = "data/tables"                              # un fichier par cellule meteo
-PAS     = 0.05                                       # pas de la grille meteo (deg)
+PAS     = 0.10                                       # pas de la grille meteo (deg) = taille de cellule
 PAUSE   = 0.2                                        # temps entre requete pvgis
-LAT_MIN, LAT_MAX = 46.30, 46.70                      # emprise des cellules a construire
-LON_MIN, LON_MAX = 0.05,  0.50 
+# LAT_MIN, LAT_MAX = 46.30, 46.70                      # emprise des cellules a construire
+# LON_MIN, LON_MAX = 0.05,  0.50 
 
 # grille table meteo
 ALPHAS = np.arange(0, 360, 15)    # orientations testees (deg, 0=N, 90=E)
@@ -43,11 +43,3 @@ PERFORMANCE_RATIO = 0.78                                           # pertes syst
 TAUX_COUVERTURE   = 1.0                                            # part de toit couverte
 SECTEURS          = ["N","NE","E","SE","S","SO","O","NO"]          
 
-__all__ = [
-    "URL", "DOSSIER", "PAS", "PAUSE", "LAT_MIN", "LAT_MAX", "LON_MIN", "LON_MAX",
-    "ALPHAS", "BETAS",
-    "BUFFER", "MNH_MIN", "PENTE_PLAT", "PENTE_MAX", "AZ_MIN", "AZ_MAX",
-    "N_DIRECTIONS", "DIST_MAX_M",
-    "ALBEDO", "N_JOURS", "RENDEMENT_MODULE", "PERFORMANCE_RATIO",
-    "TAUX_COUVERTURE", "SECTEURS",
-]

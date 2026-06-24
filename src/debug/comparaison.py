@@ -30,7 +30,7 @@ import matplotlib
 matplotlib.use("Agg")               # pas d'affichage, on sauvegarde des PNG
 import matplotlib.pyplot as plt
 
-from src.irradiance.meteo.irr_fct import telecharger, transpAgr
+from src.irradiance.meteo.grille_fct import telecharger, transpAgr
 
 # ----------------------------------------------------------------------------
 # Reglages
@@ -195,9 +195,10 @@ def _temps_par_pixel(fn):
 
 def effet_moyennage():
     """Sur 2 scenarios (fort / faible ombrage), compare :
-       - HORAIRE (verite) : ombrage applique a chaque heure reelle ;
-       - MOYENNE (notre methode) : profil (mois, heure) puis ombrage sur la moyenne.
-    Sort 2 graphes : ecart d'irradiance, et temps de calcul aval (par pixel)."""
+       - HORAIRE : annee TYPIQUE horaire (~8760 pas, moyenne par mois/jour/heure),
+                   ombrage applique a chaque heure ;
+       - MOYENNE (notre methode) : profil (mois, heure) (288 pas), ombrage sur la moyenne.
+    Sort le graphe d'ecart + le temps de calcul aval par pixel (console / CSV)."""
     print("=== Moyennage : ecart et temps (moyenne vs horaire) ===")
     df = charger_brut(LAT_MOY, LON_MOY)
     t   = df.index
@@ -208,7 +209,8 @@ def effet_moyennage():
     extra   = pvlib.irradiance.get_extra_radiation(t)
     airmass = pvlib.atmosphere.get_relative_airmass(sp["apparent_zenith"])
     el = sp["apparent_elevation"].values
-    ny = t.year.nunique()
+    garder = ~((t.month == 2) & (t.day == 29))            # annee typique = 365 jours
+    mo, jr, hr = t.month.to_numpy()[garder], t.day.to_numpy()[garder], t.hour.to_numpy()[garder]
 
     lignes = []
     for nom, pente, azim, obst in SCENARIOS_MOY:
@@ -219,9 +221,13 @@ def effet_moyennage():
         direct = poa["poa_direct"].fillna(0).values
         diffus = (poa["poa_sky_diffuse"] + poa["poa_ground_diffuse"]).fillna(0).values
 
-        # HORAIRE : ombrage a chaque heure reelle (le diffus n'est pas ombrage, comme la pipeline)
+        # HORAIRE : annee TYPIQUE horaire (moyenne par mois/jour/heure), ombrage a chaque heure
+        an = (pd.DataFrame({"mo": mo, "d": jr, "h": hr,
+                            "dir": direct[garder], "dif": diffus[garder], "el": el[garder]})
+                .groupby(["mo", "d", "h"]).mean())
+        dir_a, dif_a, el_a = an.dir.values, an.dif.values, an.el.values
         def horaire():
-            return (np.where(el < obst, 0, direct) + diffus).sum() / 1000 / ny
+            return (np.where(el_a < obst, 0, dir_a) + dif_a).sum() / 1000
 
         # MOYENNE : profil (mois, heure) construit 1 fois, puis ombrage sur la moyenne
         prof = (pd.DataFrame({"m": t.month, "h": t.hour,

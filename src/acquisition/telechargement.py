@@ -1,7 +1,7 @@
 import os, time, requests
 
 
-def telecharger_fichier(url, nom_fichier, dossier_dest='data/raw/TEST', n_essais=4, pause=3):
+def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=4, pause=3):
     """
     Telecharge un fichier en streaming, avec retry + backoff.
     --------

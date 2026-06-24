@@ -79,10 +79,14 @@ def mergeCleabs(gdf):
 
     @return GeoDataFrame : 1 ligne par cleabs (morceaux recolles)
     """
+    gdf = gdf.copy()
+    gdf["_pente_pond"] = gdf.pente_moy_incl * gdf.nb_pixels       # pour la moyenne ponderee
     agg = {c: "sum" for c in gdf.columns                          # surfaces, energies, prod, puissance, nb_pixels
-           if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c == "nb_pixels"}
-    agg.update(pente_moy_incl="mean", hauteur_pts="max",         # pente moyenne, hauteur la plus haute
+           if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c in ("nb_pixels", "_pente_pond")}
+    agg.update(hauteur_pts="max",                                 # hauteur la plus haute
                nature="first", usage_1="first", hauteur="first", # attributs BD TOPO (identiques)
                nombre_d_etages="first", geometry="first")
     out = gdf.groupby("cleabs", as_index=False).agg(agg)
+    out["pente_moy_incl"] = out._pente_pond / out.nb_pixels       # pente moyenne ponderee par pixels
+    out = out.drop(columns="_pente_pond")
     return gpd.GeoDataFrame(out, geometry="geometry", crs=gdf.crs)

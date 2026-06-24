@@ -1,5 +1,3 @@
-import re
-
 from pyproj import Transformer
 
 
@@ -37,10 +35,6 @@ def tileBounds(mns_name):
 
     @return (x_min, y_min, x_max, y_max) en Lambert 93 (tuile 1 km x 1 km)
     """
-    match = re.search(r'_(\d{4})_(\d{4})_', mns_name)
-    if not match:
-        raise ValueError(f"Nom de fichier incorrect : {mns_name}")
-
-    x_km, y_km = int(match.group(1)), int(match.group(2))
+    x_km, y_km = nomCoord(mns_name)
     x_min, y_max = x_km * 1000, y_km * 1000
     return (x_min, y_max - 1000, x_min + 1000, y_max)

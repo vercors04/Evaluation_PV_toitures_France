@@ -5,7 +5,7 @@ from src.tuile.raster import chargerDalle
 from src.tuile.donnees_dalle import nomCoord, centreWGS84
 from src.geometrie.extract_geom import extractGeom, makeMasques
 from src.geometrie.horizon import compHZ
-from src.irradiance.meteo.irr_fct import chargerTable
+from src.irradiance.meteo.grille_fct import chargerTable
 from src.irradiance.irr_calcul import irrPixels
 from src.agregation.agregation import agregerBatiment
 from src.debug import debug_pipeline as debug

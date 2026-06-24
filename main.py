@@ -1,6 +1,6 @@
 from src.acquisition.telechargement import telecharger_fichier, liste_telechargement
 from src.pipeline import traiterDalle
-from src.agregation.agregation import merger_cleabs, mergeCleabs
+from src.agregation.agregation import mergeCleabs
 from src.agregation.select import filtrer
 from src.tuile.donnees_dalle import tileBounds
 from src.acquisition.batiments import batiments
@@ -27,7 +27,8 @@ def main():
     print("1 : Commune ou Ville")
     print("2 : Département")
     print("3 : Région")
-    choix=input("Choisissez l'échelle (0,1,2 ou 3) :").strip()
+    print("4 : France")
+    choix=input("Choisissez l'échelle (0,1,2, 3 ou 4) :").strip()
 
     echelle=""
     nom_zone=""
@@ -45,13 +46,17 @@ def main():
     elif choix == "2":
         nom_zone = input("Entrez un département ou son numéro : ").strip()
         echelle="departement"
-   
+
     elif choix == "3":
         nom_zone=input("Entrez le nom d'une région: ").strip()
         echelle="region"
 
+    elif choix == "4":
+        nom_zone="France"
+        echelle="nationale"
+
     else:
-        print('Choisissez entre 0,1,2 et 3.')
+        print('Choisissez entre 0,1,2, 3 et 4.')
         return None
     
     t0 = time.time()
@@ -65,7 +70,7 @@ def main():
 
     print(f"Temps batiments : {time.time()-t0:.1f}s")
 
-    nom_zone=nom_zone.replace("'", "''").replace(" ", "_").replace(",", "") 
+    nom_zone=nom_zone.replace(" ", "_").replace(",", "")
 
     gpd.GeoDataFrame(geometry=[polygone], crs=4326).to_crs(2154).to_file(
     os.path.join(DIR_GEOJSON, f"{nom_zone}.geojson"), driver="GeoJSON")
