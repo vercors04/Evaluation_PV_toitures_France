@@ -1,6 +1,7 @@
 # src/acquisition/dalles.py
-import requests, geopandas as gpd, pandas as pd
-WFS = "https://data.geopf.fr/wfs/ows"
+import pandas as pd
+
+from src.acquisition.wfs import lireWFS
 
 def dalles(polygone):
     """
@@ -20,7 +21,7 @@ def dalles(polygone):
                       "TYPENAME": f"IGNF_{couche}-LIDAR-HD:dalle", "OUTPUTFORMAT":"application/json",
                       "CQL_FILTER": f"BBOX(geom,{miny},{minx},{maxy},{maxx})",
                       "COUNT": 5000, "STARTINDEX": start}
-            g = gpd.read_file(requests.get(WFS, params=params).text)
+            g = lireWFS(params)
             if g.empty:
                 break
             morceaux.append(g)

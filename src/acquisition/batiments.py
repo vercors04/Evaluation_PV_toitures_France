@@ -1,6 +1,7 @@
-import requests, geopandas as gpd, pandas as pd
+import pandas as pd
 
-WFS = "https://data.geopf.fr/wfs/ows"
+from src.acquisition.wfs import lireWFS
+
 NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']
 
 def batiments(polygone):
@@ -26,7 +27,7 @@ def batiments(polygone):
             "COUNT": 2000,
             "STARTINDEX": start,
         }
-        g = gpd.read_file(requests.get(WFS, params=params).text)
+        g = lireWFS(params)
         if g.empty:
             break
         morceaux.append(g)

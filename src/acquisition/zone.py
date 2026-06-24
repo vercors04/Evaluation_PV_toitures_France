@@ -1,8 +1,8 @@
 # src/acquisition/zone.py
-import requests, geopandas as gpd
+import requests
 from shapely.geometry import box
 
-WFS = "https://data.geopf.fr/wfs/ows"
+from src.acquisition.wfs import lireWFS
 
 def zone(echelle, nom_zone, code_dep=None):
     """
@@ -19,7 +19,7 @@ def zone(echelle, nom_zone, code_dep=None):
         params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature",
                   "TYPENAME": "BDTOPO_V3:region", "OUTPUTFORMAT": "application/json",
                   "COUNT": 100}
-        gdf = gpd.read_file(requests.get(WFS, params=params).text)
+        gdf = lireWFS(params)
         if gdf.empty:
             return None
         france = gdf.geometry.union_all()                       # (unary_union si vieille version)
@@ -44,6 +44,6 @@ def zone(echelle, nom_zone, code_dep=None):
     params = {"SERVICE":"WFS","VERSION":"2.0.0","REQUEST":"GetFeature",
               "TYPENAME": f"BDTOPO_V3:{echelle}", "OUTPUTFORMAT":"application/json", "CQL_FILTER": cql}
     
-    gdf = gpd.read_file(requests.get(WFS, params=params).text)
+    gdf = lireWFS(params)
 
     return None if gdf.empty else gdf.geometry.iloc[0]

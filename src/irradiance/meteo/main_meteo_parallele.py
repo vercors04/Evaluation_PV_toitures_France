@@ -17,7 +17,7 @@ from src.irradiance.meteo.grille_calculs import grilleCellules, construireCellul
 from src.irradiance.meteo.grille_fct import cheminTable
 from src.config import DOSSIER
 
-N_COEURS = 6        # nb de processus en parallele (rester raisonnable : PVGIS peut throttler)
+N_COEURS = 10       # nb de processus en parallele (rester raisonnable : PVGIS peut throttler)
 
 
 def _faire(cellule):
