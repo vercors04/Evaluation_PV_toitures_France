@@ -2,7 +2,7 @@
 import requests
 from shapely.geometry import box
 
-from src.acquisition.wfs import lireWFS
+from src.acquisition.requetes import lireWFS
 
 def zone(echelle, nom_zone, code_dep=None):
     """

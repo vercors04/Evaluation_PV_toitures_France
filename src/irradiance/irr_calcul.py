@@ -7,22 +7,33 @@ TRIM = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
 
 
 def interpBilin(T, a, p):
-    """Interpolation bilineaire de la table T (nα, nβ, 12, 24) aux orientations a
-    et pentes p (longueur N). L'azimut boucle (345° -> 0°) ; la pente reste dans la grille.
+    """
+    Interpolation bilineaire de la table T en (orientation, pente), pour N pixels.
+    L'azimut boucle (345° -> 0°) ; la pente est bornee dans la grille [0, derniere pente].
+    Les poids sont forces en float32 pour que tout le calcul reste en float32 (la table l'est
+    deja) : evite de materialiser les gros tableaux (N, 12, 24) en float64 (memoire / 2).
+    --------
+    @param[in] T : table a interpoler (nα, nβ, 12, 24), float32 (direct B ou diffus D, W/m2)
+    @param[in] a : orientation de chaque pixel (deg), shape (N,)
+    @param[in] p : pente de chaque pixel (deg), shape (N,)
 
-    @return (N, 12, 24)."""
-    pas_a, pas_b = ALPHAS[1] - ALPHAS[0], BETAS[1] - BETAS[0]
+    @return out : profil (mois, heure) interpole par pixel, shape (N, 12, 24), float32
+    """
+    pas_a, pas_b = int(ALPHAS[1] - ALPHAS[0]), int(BETAS[1] - BETAS[0])   
+
     fa = a / pas_a
     i0 = np.floor(fa).astype(int) % len(ALPHAS)
     i1 = (i0 + 1) % len(ALPHAS)
-    wa = (fa - np.floor(fa))[:, None, None]
+    wa = (fa - np.floor(fa)).astype(np.float32)[:, None, None]           
+
     fb = np.clip(p / pas_b, 0, len(BETAS) - 1)
     j0 = np.floor(fb).astype(int)
     j1 = np.minimum(j0 + 1, len(BETAS) - 1)
-    wb = (fb - j0)[:, None, None]
+    wb = (fb - j0).astype(np.float32)[:, None, None]                      
+
     out = ((1 - wa) * (1 - wb) * T[i0, j0] + wa * (1 - wb) * T[i1, j0]
            + (1 - wa) * wb * T[i0, j1] + wa * wb * T[i1, j1])
-    return out.astype(np.float32)                            # garder float32 (comme la table)
+    return out.astype(np.float32)                            
 
 
 def masquerHorizon(B_pix, horizon, SAZ, SEL):

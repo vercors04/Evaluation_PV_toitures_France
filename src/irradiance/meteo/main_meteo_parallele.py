@@ -15,9 +15,8 @@ from concurrent.futures import ProcessPoolExecutor
 from src.acquisition.zone import zone
 from src.irradiance.meteo.grille_calculs import grilleCellules, construireCellule
 from src.irradiance.meteo.grille_fct import cheminTable
-from src.config import DOSSIER
+from src.config import DOSSIER, N_COEURS
 
-N_COEURS = 10       # nb de processus en parallele (rester raisonnable : PVGIS peut throttler)
 
 
 def _faire(cellule):

@@ -1,7 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 
-from src.config import SECTEURS, TAUX_COUVERTURE, RENDEMENT_MODULE, PERFORMANCE_RATIO
+from src.config import SECTEURS, TAUX_COUVERTURE, RENDEMENT_MODULE, PERFORMANCE_RATIO, ATTRS_BATI
 
 PV = TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO   # kWh recus -> kWh produits
 
@@ -47,24 +47,23 @@ def agregerBatiment(df, gdf, hauteur):
     res["prod_an_kwh_orp"]   = res.irr_an_kwh_orp * PV          # plat + sud
 
     out = gdf.join(res, how="inner")               # garde les batiments avec >= 1 pixel de toit
-    ordre = [
-        "cleabs", "nature", "usage_1", "hauteur", "nombre_d_etages",
-        "hauteur_pts",
-        "nb_pixels", "surf_tot_m2", "surf_plate_m2",
-        "surf_incl_m2", "surf_incl_or_m2", "pente_moy_incl",
-        "surf_incl_N_m2", "surf_incl_NE_m2", "surf_incl_E_m2", "surf_incl_SE_m2",
-        "surf_incl_S_m2", "surf_incl_SO_m2", "surf_incl_O_m2", "surf_incl_NO_m2",
-        "irr_an_kwh", "prod_an_kwh",
-        "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp",
-        "prod_T1_kwh_orp", "prod_T2_kwh_orp", "prod_T3_kwh_orp", "prod_T4_kwh_orp",
-        "geometry",
-    ]
+    ordre = (["cleabs", *ATTRS_BATI, "hauteur_pts",
+              "nb_pixels", "surf_tot_m2", "surf_plate_m2",
+              "surf_incl_m2", "surf_incl_or_m2", "pente_moy_incl"]
+             + [f"surf_incl_{s}_m2" for s in SECTEURS]
+             + ["irr_an_kwh", "prod_an_kwh", "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp"]
+             + [f"prod_T{t}_kwh_orp" for t in range(1, 5)]
+             + ["geometry"])
     return out[ordre]
 
 
-
 def merger_cleabs(gdf):
-    """Un batiment a cheval sur 2 dalles apparait 2x -> on garde le plus gros morceau."""
+    """Un batiment a cheval sur 2 dalles apparait 2x -> on garde le plus gros morceau.
+    --------
+    @param[in] gdf : sortie de agregerBatiment (peut avoir plusieurs lignes par cleabs)
+
+    @return GeoDataFrame : 1 ligne par cleabs 
+    """
     return (gdf.sort_values("nb_pixels", ascending=False)
                .drop_duplicates("cleabs")
                .reset_index(drop=True))
@@ -83,9 +82,8 @@ def mergeCleabs(gdf):
     gdf["_pente_pond"] = gdf.pente_moy_incl * gdf.nb_pixels       # pour la moyenne ponderee
     agg = {c: "sum" for c in gdf.columns                          # surfaces, energies, prod, puissance, nb_pixels
            if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c in ("nb_pixels", "_pente_pond")}
-    agg.update(hauteur_pts="max",                                 # hauteur la plus haute
-               nature="first", usage_1="first", hauteur="first", # attributs BD TOPO (identiques)
-               nombre_d_etages="first", geometry="first")
+    agg.update({a: "first" for a in ATTRS_BATI})      # attributs BD TOPO recopies
+    agg.update(hauteur_pts="max", geometry="first")
     out = gdf.groupby("cleabs", as_index=False).agg(agg)
     out["pente_moy_incl"] = out._pente_pond / out.nb_pixels       # pente moyenne ponderee par pixels
     out = out.drop(columns="_pente_pond")
