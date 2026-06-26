@@ -90,7 +90,7 @@ def main():
 
     nom_zone = nom_zone.replace(" ", "_").replace(",", "")
     gpd.GeoDataFrame(geometry=[polygone], crs=4326).to_crs(2154).to_file(
-        os.path.join(DIR_GEOJSON, f"{nom_zone}.geojson"), driver="GeoJSON")
+        os.path.join(DIR_GEOJSON, f"{nom_zone}{code_dep or ''}.geojson"), driver="GeoJSON")
 
     gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}{code_dep or ''}.gpkg")
 
