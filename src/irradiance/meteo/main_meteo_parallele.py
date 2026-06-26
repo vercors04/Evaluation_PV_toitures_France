@@ -1,11 +1,4 @@
 """
-src/irradiance/meteo/main_meteo_parallele.py
-
-Comme main_meteo, mais construit les cellules EN PARALLELE sur plusieurs coeurs
-(ProcessPoolExecutor). Script independant : il ne fait que reutiliser les fonctions
-existantes (zone, grilleCellules, construireCellule), il ne modifie rien d'autre.
-
-Lancer (env conda 'stage-lidar', depuis la racine du projet) :
     python -m src.irradiance.meteo.main_meteo_parallele
 """
 import os

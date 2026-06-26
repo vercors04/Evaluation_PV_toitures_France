@@ -36,7 +36,7 @@ def traiter_une_dalle(tache):
         print(f"ECHEC dalle {nom_mns} : {e}")
         return None
     finally:
-        for pth in (mns_path, mnt_path):           # nettoyage meme en cas d'erreur
+        for pth in (mns_path, mnt_path):           
             if pth and os.path.exists(pth):
                 os.remove(pth)
 
@@ -94,7 +94,9 @@ def main():
 
     gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}{code_dep or ''}.gpkg")
 
-    # --- une tache par dalle non vide ---
+
+
+
     taches = []
     for nom_mnt, url_mnt, nom_mns, url_mns in liste_telechargement(dalles(polygone)):
         xmin, ymin, xmax, ymax = tileBounds(nom_mns)
@@ -114,7 +116,10 @@ def main():
     if not resultats:
         print("aucun batiment traite"); return None
 
-    # --- fusion finale + UNE seule ecriture ---
+
+
+
+
     t0 = time.time()
     g = pd.concat(resultats, ignore_index=True)
     g = gpd.GeoDataFrame(g, geometry="geometry", crs=2154)
@@ -122,12 +127,18 @@ def main():
     g = mergeCleabs(g);  print("apres merge      :", len(g))
     g = filtrer(g);      print("apres filtre     :", len(g))
 
+
+
+
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
     g.to_file(gpkg_path, driver="GPKG", layer="batiments")
     print(f"Filtrage + ecriture : {time.time()-t0:.1f}s")
     print(f"Final : {len(g)} batiments")
     print(f"fichier enregistré  : {nom_zone}{code_dep or ''}.gpkg")
+
+
+
 
 
 if __name__ == "__main__":
