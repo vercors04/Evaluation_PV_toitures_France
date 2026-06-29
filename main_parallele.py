@@ -17,7 +17,7 @@ from src.acquisition.dalles import dalles
 from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON, N_COEURS
 
 
-def traiter_une_dalle(tache):
+def trait1Dalle(tache):
     """
     Traite UNE dalle dans un processus worker : telecharge MNS/MNT, calcule, nettoie.
     Fonction au niveau module = picklable par ProcessPoolExecutor.
@@ -105,11 +105,11 @@ def main():
             taches.append((nom_mnt, url_mnt, nom_mns, url_mns, gdf_dalle))
     print(f"{len(taches)} dalles a traiter")
 
-    # --- traitement des dalles EN PARALLELE (processus) ---
+
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=N_COEURS,
                              initializer=numba.set_num_threads, initargs=(1,)) as ex:
-        resultats = [out for out in ex.map(traiter_une_dalle, taches)
+        resultats = [out for out in ex.map(trait1Dalle, taches)
                      if out is not None and not out.empty]
     print(f"Traitement dalles : {time.time()-t0:.1f}s")
 
