@@ -8,14 +8,14 @@ from src.config import ALPHAS, BETAS, ALBEDO, DOSSIER, PAS, URL
 
 
 def transpAgr(bhi, dhi, lat, lon):
-    """Transpose CHAQUE pas de temps (Perez) puis moyenne par (mois, heure).
+    """
+    Transpose chaque pas de temps (Perez) puis moyenne par (mois, heure).
+    --------
+    @param[in] bhi, dhi : Series (W/m2, plan horizontal) indexees par un DatetimeIndex UTC
+    @param[in] lat, lon : centre de la cellule (deg WGS84)
 
-    @param[in]  bhi, dhi : Series (W/m2, plan horizontal) indexees par un DatetimeIndex UTC.
-    @param[in]  lat, lon : coordonnees du centre de la cellule, en degres WGS84
-
-    @return B, D     : tableaux (24 alphas, 8 betas, 12 mois, 24 heures), irradiance directe et diffuse en W/m2
-    @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil en degres
-                       (sauvegardes pour le masquage par l'horizon au niveau tuile, sans recalcul)
+    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (W/m2)
+    @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil (deg)
     """
     times = bhi.index
     ghi = (bhi + dhi).clip(lower=0)
@@ -49,7 +49,7 @@ def transpAgr(bhi, dhi, lat, lon):
 
 def profMH(serie, cles):
     """
-    Moyenne par (mois, heure UTC) -> tableau (12, 24). Bins absents = 0.
+    Moyenne par (mois, heure UTC), tableau (12, 24), bins absents a 0.
     --------
     @param[in] serie : Series indexee par un DatetimeIndex UTC
     @param[in] cles  : liste de Series (ex: [times.month, times.hour]) pour grouper la serie
@@ -98,14 +98,13 @@ _cache = {}
 
 def chargerTable(lat, lon):
     """
-    Charge la table de la cellule contenant un point quelconque
-    (ex: le centre d'une tuile LiDAR). C'est LE point d'entree pour
-    la pipeline tuile : centreWGS84(...) -> chargerTable(...).
+    Charge (avec cache) la table de la cellule contenant un point quelconque.
+    Point d'entree de la pipeline tuile : centreWGS84(...) puis chargerTable(...).
     --------
-    @param[in] lat, lon : coordonnees quelconques, en degres WGS84
+    @param[in] lat, lon : coordonnees quelconques (deg WGS84)
 
     @return B, D     : tableaux (n_alphas, n_betas, 12, 24) en W/m2
-    @return SAZ, SEL : tableaux (12, 24), azimut et elevation du soleil en degres
+    @return SAZ, SEL : tableaux (12, 24), azimut et elevation du soleil (deg)
     """
     la = round(round(lat / PAS) * PAS, 2)
     lo = round(round(lon / PAS) * PAS, 2)

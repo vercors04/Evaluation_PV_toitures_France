@@ -3,7 +3,7 @@ from pyproj import Transformer
 
 def nomCoord(mns_name):
     """
-    Coordonnees du coin nord-ouest de la tuile (convention IGN), en km Lambert 93.
+    Coin nord-ouest de la tuile (convention IGN), en km Lambert 93.
     --------
     @param[in] mns_name : nom du fichier MNS IGN (ex: LHD_FXX_0495_6611_MNS_...tif)
 
@@ -33,7 +33,7 @@ def tileBounds(mns_name):
     --------
     @param[in] mns_name : nom du fichier MNS IGN (0495_6611 -> x=495000, y=6611000, coin NO)
 
-    @return (x_min, y_min, x_max, y_max) en Lambert 93 (tuile 1 km x 1 km)
+    @return (x_min, y_min, x_max, y_max) : emprise en Lambert 93 (tuile 1 km x 1 km)
     """
     x_km, y_km = nomCoord(mns_name)
     x_min, y_max = x_km * 1000, y_km * 1000

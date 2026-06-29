@@ -14,7 +14,8 @@ HAUT_MAX = 35
 
 #WFS
 WFS = "https://data.geopf.fr/wfs/ows"
-N_COEURS = 5     
+N_COEURS = 5
+
 
 #batiments
 NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']

@@ -6,16 +6,16 @@ from src.config import N_DIRECTIONS, DIST_MAX_M, CAP
 @njit(parallel=True, cache=True)
 def compHZ(mns, masque_toiture, res, n_directions=N_DIRECTIONS, max_distance_m=DIST_MAX_M):
     """
-    Angle d'horizon par pixel de toit, dans n_directions directions (raycast, compile numba).
-    Pour chaque pixel/direction : avance le long du rayon et garde la pente max (un seul arctan a la fin).
+    Angle d'horizon par pixel de toit, dans n_directions directions (raycast, numba).
+    Pour chaque pixel et direction : avance le long du rayon et garde la pente max.
     --------
     @param[in] mns            : 2D float de la dalle (NaN hors donnees)
-    @param[in] masque_toiture : 2D bool — True sur les pixels de toit
+    @param[in] masque_toiture : 2D bool, True sur les pixels de toit
     @param[in] res            : taille du pixel (m)
     @param[in] n_directions   : nombre de directions azimutales
     @param[in] max_distance_m : rayon de recherche (m)
 
-    @return horizon : (N_pixels_toit, n_directions) angle d'horizon (deg), ordre np.where(masque_toiture) ;
+    @return horizon : (N_pixels_toit, n_directions) angle d'horizon (deg), ordre np.where(masque_toiture),
                       convention boussole 000=N, 090=E, 180=S, 270=O
     """
     H, W = mns.shape

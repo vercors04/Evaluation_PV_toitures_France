@@ -12,55 +12,55 @@ from src.debug import debug_pipeline as debug
 from src.agregation.select import hBat
 
 
-def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None):
+def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None, temps=None):
     """
-    Traite une dalle : geometrie -> masques -> horizon -> irradiance -> agregation par batiment.
+    Traite une dalle : geometrie, masques, horizon, irradiance, agregation par batiment.
     --------
     @param[in] mns_path, mnt_path : chemins des rasters MNS / MNT IGN
-    @param[in] gdf                : GeoDataFrame des batiments de la dalle (Lambert 93)
-    @param[in] debug_dir          : si fourni, exporte les rasters de debug
+    @param[in] gdf       : GeoDataFrame des batiments de la dalle (Lambert 93)
+    @param[in] debug_dir : si fourni, exporte les rasters intermediaires
+    @param[in] temps     : dict optionnel rempli avec la duree de chaque etape
 
     @return out : GeoDataFrame, 1 ligne par batiment
     """
 
     mns_name = os.path.basename(mns_path)
 
-    # ------ Lecture des raster, chargements des masques et donnees ------
-    t0 = time.time()
+    # geometrie
+    t0 = time.perf_counter()
     mns, mnt, meta = chargerDalle(mns_path, mnt_path)
     pente, aspect, masque_bat, mnh = extractGeom(mns, mnt, gdf, meta)
     incline_or, incline, plat = makeMasques(pente, aspect, masque_bat)
     toiture = incline | plat
-    print(f"Geometrie  : {time.time()-t0:.1f}s")
+    if temps is not None: temps["geometrie"] = time.perf_counter() - t0
 
 
 
-    # ------ horizon ------
-    t0 = time.time()
+    # horizon
+    t0 = time.perf_counter()
     horizon = compHZ(mns, toiture, meta["resolution"])
-    print(f"Horizon    : {time.time()-t0:.1f}s")
+    if temps is not None: temps["horizon"] = time.perf_counter() - t0
 
 
-
-    # ------ irradiance par pixel ------
-    t0 = time.time()
+    # irradiance
+    t0 = time.perf_counter()
     lat, lon = centreWGS84(*nomCoord(mns_name))
     B, D, SAZ, SEL = chargerTable(lat, lon)
     df  = irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
                     meta["resolution"], B, D, SAZ, SEL, horizon)
-    print(f"Irradiance : {time.time()-t0:.1f}s ")
+    if temps is not None: temps["irradiance"] = time.perf_counter() - t0
 
 
-    # ------ agregation par bat + ecriture ------
-    t0 = time.time()
+    # agregation par batiment
+    t0 = time.perf_counter()
     hauteur = hBat (mnh, masque_bat, 0.95)
     out = agregerBatiment(df, gdf, hauteur)
-    print(f"Agregation batiments : {time.time()-t0:.1f}s ")
+    if temps is not None: temps["agregation batiment"] = time.perf_counter() - t0
 
 
 
 
-    # ------ debug pour visualisation ------
+    # export debug optionnel
     if debug_dir is not None:
         debug.exportRasters({
             "pente": pente, "aspect": aspect, "mnh": mnh,

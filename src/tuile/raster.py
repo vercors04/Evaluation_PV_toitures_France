@@ -9,7 +9,7 @@ def chargerDalle(mns_path, mnt_path):
     @param[in] mns_path, mnt_path : chemins des GeoTIFF MNS / MNT IGN
 
     @return mns, mnt : tableaux 2D float32 (NaN hors donnees)
-    @return meta     : profil rasterio (+ cle "resolution" = taille pixel en m)
+    @return meta     : profil rasterio (cle "resolution" = taille pixel en m)
     """
     with rasterio.open(mns_path) as src:
         mns  = src.read(1).astype(np.float32)
@@ -32,7 +32,7 @@ def ecrireGeotiff(arr, meta, path, nodata=-9999.0):
     @param[in] arr    : tableau 2D a ecrire
     @param[in] meta   : profil rasterio de la dalle (cle "resolution" toleree)
     @param[in] path   : chemin de sortie
-    @param[in] nodata : valeur nodata pour les flottants (NaN -> nodata)
+    @param[in] nodata : valeur nodata pour les flottants (NaN remplace par nodata)
     """
     if np.issubdtype(arr.dtype, np.floating):
         dtype = "float32"

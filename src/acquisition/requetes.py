@@ -6,6 +6,14 @@ from src.config import WFS
 
 
 def lireWFS(params, n=8):
+    """
+    Requete WFS GetFeature, renvoie un GeoDataFrame. Reessaie n fois avant d'echouer.
+    --------
+    @param[in] params : parametres de la requete WFS
+    @param[in] n      : nombre de tentatives
+
+    @return GeoDataFrame du resultat (leve RuntimeError apres n echecs)
+    """
     err = ""
     for _ in range(n):
         try:
@@ -20,6 +28,14 @@ def lireWFS(params, n=8):
 
 
 def compter(params, n=8):
+    """
+    Nombre d'entites correspondant a la requete WFS (numberMatched). Reessaie n fois.
+    --------
+    @param[in] params : parametres de la requete WFS
+    @param[in] n      : nombre de tentatives
+
+    @return nombre d'entites (leve RuntimeError apres n echecs)
+    """
     err = ""
     for _ in range(n):
         try:

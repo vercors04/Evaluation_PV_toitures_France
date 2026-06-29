@@ -42,3 +42,7 @@ def batiments(polygone):
         tout = tout[tout[col].isin(val) if isinstance(val, (list, tuple, set)) else tout[col] == val]
     return (tout[["cleabs", *ATTRS_BATI, "geometry"]]
             .reset_index(drop=True).to_crs(2154))
+
+
+
+

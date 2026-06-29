@@ -16,8 +16,8 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
     @param[in] mnh_min  : hauteur min au-dessus du sol pour etre un toit (m)
 
     @return pente, aspect : 2D float (deg), NaN hors pixels de toit valides
-    @return masque_bat    : 2D int — index gdf + 1 du batiment (0 = hors toit valide)
-    @return mnh           : 2D float — hauteur au-dessus du sol (m)
+    @return masque_bat    : 2D int, index gdf + 1 du batiment (0 hors toit valide)
+    @return mnh           : 2D float, hauteur au-dessus du sol (m)
     """
     mnh = mns - mnt
 
@@ -31,7 +31,7 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
     pente  = np.degrees(np.arctan(np.hypot(dz_dcol, dz_dligne)))
     aspect = np.degrees(np.arctan2(-dz_dcol, dz_dligne)) % 360
 
-    # on enleve les bords de toit (a mentionner dans le rapport)
+    # erosion : retire les bords de toit
     valid = binary_erosion(pts_ok, np.ones((3, 3), dtype=bool))
 
     masque_bat = np.where(valid, masque_bat, 0).astype("int32")   
@@ -42,15 +42,15 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
 
 def makeMasques(pente, aspect, masque_bat):
     """
-    Applique les seuils de selection -> masques booleens de toiture.
-    Separe de extractGeom : on peut faire varier les seuils sans tout recalculer.
+    Applique les seuils de selection et renvoie les masques booleens de toiture.
+    Separe de extractGeom pour faire varier les seuils sans tout recalculer.
     --------
     @param[in] pente, aspect : 2D float (deg), NaN hors toit valide
-    @param[in] masque_bat    : 2D int — index gdf + 1 (0 = hors toit valide)
+    @param[in] masque_bat    : 2D int, index gdf + 1 (0 hors toit valide)
 
-    @return incline_or : 2D bool — incline ET oriente (azimut AZ_MIN..AZ_MAX)
-    @return incline    : 2D bool — incline toutes orientations (PENTE_PLAT..PENTE_MAX)
-    @return plat       : 2D bool — plat (< PENTE_PLAT)
+    @return incline_or : 2D bool, incline et oriente (azimut AZ_MIN..AZ_MAX)
+    @return incline    : 2D bool, incline toutes orientations (PENTE_PLAT..PENTE_MAX)
+    @return plat       : 2D bool, plat (< PENTE_PLAT)
     """
     valid      = masque_bat > 0
     incline    = valid & (pente >= PENTE_PLAT) & (pente <= PENTE_MAX)

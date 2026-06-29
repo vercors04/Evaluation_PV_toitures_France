@@ -6,9 +6,9 @@ def hBat(mnh, masque_bat, q=0.95):
     """
     Hauteur par batiment : quantile q du MNH sur l'emprise (m).
     --------
-    @param[in] mnh        : 2D float — hauteur au-dessus du sol (m)
-    @param[in] masque_bat : 2D int — index gdf + 1 du batiment (0 = hors batiment)
-    @param[in] q          : quantile (0.95 = p95, robuste aux cheminees/bruit)
+    @param[in] mnh        : 2D float, hauteur au-dessus du sol (m)
+    @param[in] masque_bat : 2D int, index gdf + 1 du batiment (0 hors batiment)
+    @param[in] q          : quantile (0.95 = p95, robuste aux cheminees et au bruit)
 
     @return Series indexee par id (= index gdf) : hauteur du batiment (m)
     """

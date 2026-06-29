@@ -9,11 +9,12 @@ PV = TAUX_COUVERTURE * RENDEMENT_MODULE * PERFORMANCE_RATIO   # kWh recus -> kWh
 def agregerBatiment(df, gdf, hauteur):
     """
     Agrege les pixels par batiment, applique le modele PV, joint a la BD TOPO.
-    Production / puissance : base "orientee" = plat + incline sud (pans nord exclus).
+    Production / puissance sur base "orientee" = plat + incline sud (pans nord exclus).
     Surfaces descriptives (surf_incl_m2, secteurs, pente_moy_incl) : toutes orientations.
     --------
-    @param[in] df  : sortie de irrPixels (1 ligne par pixel)
-    @param[in] gdf : GeoDataFrame des batiments (index 0..n-1 = df.id)
+    @param[in] df      : sortie de irrPixels (1 ligne par pixel)
+    @param[in] gdf     : GeoDataFrame des batiments (index 0..n-1 = df.id)
+    @param[in] hauteur : Series hauteur par batiment (index = df.id), issue du MNH
 
     @return out : GeoDataFrame, 1 ligne par batiment ayant >= 1 pixel de toit
     """
@@ -57,12 +58,13 @@ def agregerBatiment(df, gdf, hauteur):
     return out[ordre]
 
 
-def merger_cleabs(gdf):
-    """Un batiment a cheval sur 2 dalles apparait 2x -> on garde le plus gros morceau.
+def mergerCLeabs_supr(gdf):
+    """
+    Deduplique un batiment a cheval sur 2 dalles en gardant le plus gros morceau.
     --------
-    @param[in] gdf : sortie de agregerBatiment (peut avoir plusieurs lignes par cleabs)
+    @param[in] gdf : sortie de agregerBatiment (plusieurs lignes possibles par cleabs)
 
-    @return GeoDataFrame : 1 ligne par cleabs 
+    @return GeoDataFrame : 1 ligne par cleabs
     """
     return (gdf.sort_values("nb_pixels", ascending=False)
                .drop_duplicates("cleabs")
@@ -72,9 +74,9 @@ def merger_cleabs(gdf):
 def mergeCleabs(gdf):
     """
     Recolle les morceaux d'un meme batiment a cheval sur 2 dalles (meme cleabs) :
-    somme les grandeurs additives, moyenne la pente, garde la hauteur max.
+    somme les grandeurs additives, moyenne ponderee de la pente, garde la hauteur max.
     --------
-    @param[in] gdf : sortie de agregerBatiment (peut avoir plusieurs lignes par cleabs)
+    @param[in] gdf : sortie de agregerBatiment (plusieurs lignes possibles par cleabs)
 
     @return GeoDataFrame : 1 ligne par cleabs (morceaux recolles)
     """

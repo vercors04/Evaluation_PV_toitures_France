@@ -23,7 +23,6 @@ def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=8, pause=5):
             with open(chemin, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"{nom_fichier} telecharge")
             return chemin  #si tout ok un seul essai
         
 
@@ -65,7 +64,6 @@ def liste_telechargement(dictionnaire_resultats):
         if id_dalle in dico_mns:
             url_mns, nom_mns = dico_mns[id_dalle]
             liste_paires.append((nom_mnt, url_mnt, nom_mns, url_mns))
-    
-    print(f"{len(liste_paires)} paires trouvées")
+
     return liste_paires
 
