@@ -1,26 +1,28 @@
+import os
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
+import numba
+import pandas as pd
+import geopandas as gpd
+
 from src.acquisition.telechargement import telecharger_fichier, liste_telechargement
 from src.pipeline import traiterDalle
 from src.agregation.agregation import mergeCleabs
 from src.agregation.select import filtrer
 from src.tuile.donnees_dalle import tileBounds
 from src.acquisition.batiments import batiments
-from src.acquisition.zone import zone  
+from src.acquisition.zone import zone
 from src.acquisition.dalles import dalles
-import os
-import concurrent.futures
-import geopandas as gpd
-import time
+from src.debug.affichage_terminal import afficherBilan, progressTerminal
+from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON, N_COEURS
 
-from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON
 
 
 def main():
-    
     os.makedirs(DIR_GEOJSON, exist_ok=True)
     os.makedirs(OUT_DIR_PROCESSED, exist_ok=True)
     os.makedirs(OUT_DIR_RAW, exist_ok=True)
-
-
 
     print("Choix de l'échelle territoriale:")
     print("0 : Adresse")
@@ -28,109 +30,188 @@ def main():
     print("2 : Département")
     print("3 : Région")
     print("4 : France")
-    choix=input("Choisissez l'échelle (0,1,2, 3 ou 4) :").strip()
+    choix = input("Choisissez l'échelle (0,1,2, 3 ou 4) :").strip()
 
-    echelle=""
-    nom_zone=""
-    code_dep=None
+    echelle = ""
+    nom_zone = ""
+    code_dep = None
 
-    if choix=="0":
-        nom_zone=input('Entrez une adresse :').strip()
-        echelle="adresse"
-
+    if choix == "0":
+        nom_zone = input('Entrez une adresse :').strip()
+        echelle = "adresse"
     elif choix == "1":
-        nom_zone=input("Entrez une ville ou une commune : ").strip()
+        nom_zone = input("Entrez une ville ou une commune : ").strip()
         code_dep = input("Entrez le numéro de département : ").strip()
-        echelle="commune"
-
+        echelle = "commune"
     elif choix == "2":
         nom_zone = input("Entrez un département ou son numéro : ").strip()
-        echelle="departement"
-
+        echelle = "departement"
     elif choix == "3":
-        nom_zone=input("Entrez le nom d'une région: ").strip()
-        echelle="region"
-
+        nom_zone = input("Entrez le nom d'une région: ").strip()
+        echelle = "region"
     elif choix == "4":
-        nom_zone="France"
-        echelle="nationale"
-
+        nom_zone = "France"
+        echelle = "nationale"
     else:
         print('Choisissez entre 0,1,2, 3 et 4.')
         return None
-    
+
+
+    bilan = runPipeline(echelle, nom_zone, code_dep,
+                        on_progress=progressTerminal, on_log=print)
+    afficherBilan(bilan)
+
+
+
+
+
+
+def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print):
+    """
+    Traite la zone : dalles, calcul parallele, fusion, filtre, ecriture du gpkg.
+    --------
+    @param[in] echelle, nom_zone, code_dep : definition de la zone (voir zone)
+    @param[in] on_progress : callback (i, total) appele a chaque dalle finie (None = aucun)
+    @param[in] on_log      : callback (message) pour les messages (defaut print)
+
+    @return bilan : dict (fichier, total, echecs, moyennes_dalle, temps_globaux, batiments) ;
+                    None si zone introuvable ou aucun batiment
+    """
+    t_total = time.time() 
     t0 = time.time()
     polygone = zone(echelle, nom_zone.replace("'", "''"), code_dep)
     if polygone is None:
-        print("zone introuvable"); return None
+        on_log("zone introuvable"); return None
 
     gdf_bati = batiments(polygone)
     if gdf_bati is None or gdf_bati.empty:
-        print("aucun batiment"); return None
+        on_log("aucun batiment"); return None
+    t_bati = time.time() - t0
 
-    print(f"Temps batiments : {time.time()-t0:.1f}s")
-
-    nom_zone=nom_zone.replace(" ", "_").replace(",", "")
-
+    nom_zone = nom_zone.replace(" ", "_").replace(",", "")
     gpd.GeoDataFrame(geometry=[polygone], crs=4326).to_crs(2154).to_file(
-    os.path.join(DIR_GEOJSON, f"{nom_zone}.geojson"), driver="GeoJSON")
+        os.path.join(DIR_GEOJSON, f"{nom_zone}{code_dep or ''}.geojson"), driver="GeoJSON")
 
     gpkg_path = os.path.join(OUT_DIR_PROCESSED, f"{nom_zone}{code_dep or ''}.gpkg")
+
+
+    taches = []
+    for nom_mnt, url_mnt, nom_mns, url_mns in liste_telechargement(dalles(polygone)):
+        xmin, ymin, xmax, ymax = tileBounds(nom_mns)
+        gdf_dalle = gdf_bati.cx[xmin:xmax, ymin:ymax]
+        if not gdf_dalle.empty:
+            taches.append((nom_mnt, url_mnt, nom_mns, url_mns, gdf_dalle))
+
+    total = len(taches)
+    resultats  = []
+    temps_tous = []
+    echecs     = []
+
+    on_log(f"{total} dalles a traiter")
+
+    t0 = time.time()
+    with ProcessPoolExecutor(max_workers=N_COEURS,
+                             initializer=numba.set_num_threads, initargs=(1,)) as ex:
+        for i, (out, temps) in enumerate(ex.map(trait1Dalle, taches), 1):
+            if out is None:
+                echecs.append({"nom": temps.get("nom", "?"), "erreur": temps.get("erreur", "")})      
+                on_log(f"echec dalle {temps.get('nom','?')}") 
+            elif not out.empty:
+                resultats.append(out)
+                temps_tous.append(temps)
+            if on_progress is not None:
+                on_progress(i, total)                     
+    t_traitement = time.time() - t0
+
+    if not resultats:
+        on_log("aucun batiment traite")
+        return {"fichier": None, "total": total, "echecs": echecs}
+
+
+    t0 = time.time()
+    g = pd.concat(resultats, ignore_index=True)
+    g = gpd.GeoDataFrame(g, geometry="geometry", crs=2154)
+    n_avant = len(g)
+    g = mergeCleabs(g);  n_merge  = len(g)
+    g = filtrer(g);      n_filtre = len(g)
+
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
-            
-    for nom_mnt, url_mnt, nom_mns, url_mns in liste_telechargement(dalles(polygone)):
-        try:
-            xmin, ymin, xmax, ymax = tileBounds(nom_mns)
-            gdf_dalle = gdf_bati.cx[xmin:xmax, ymin:ymax] #renvoie les bat qui sont dans la tuile, pareil que gdf_bati[gdf_bati.intersects(box(xmin,ymin,xmax,ymax))]
-            if gdf_dalle.empty:
-                print(f"{nom_mns} : 0 batiments, dalle pas traitee")
-                continue 
+    g.to_file(gpkg_path, driver="GPKG", layer="batiments")
+    t_ecriture = time.time() - t0
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex: 
-                t0 = time.time()
-                f_mnt = ex.submit(telecharger_fichier, url_mnt, nom_mnt, OUT_DIR_RAW)
-                f_mns = ex.submit(telecharger_fichier, url_mns, nom_mns, OUT_DIR_RAW)
+    def moyenne(cle):
+        vals = [t[cle] for t in temps_tous if cle in t]
+        return sum(vals) / len(vals) if vals else 0.0
 
-            mnt_path = f_mnt.result()
-            mns_path = f_mns.result()
-            print(f"Telechargement MNS MNT : {time.time()-t0:.1f}s")
+    return {
+        "fichier": f"{nom_zone}{code_dep or ''}.gpkg",
+        "total":   total,
+        "echecs":  echecs,
+        "moyennes_dalle": {
+            "telechargement": moyenne("telechargement"),
+            "geometrie":      moyenne("geometrie"),
+            "horizon":        moyenne("horizon"),
+            "irradiance":     moyenne("irradiance"),
+            "agregation":     moyenne("agregation batiment"),
+        },
+        "temps_globaux": {
+            "batiments":  t_bati,        # recuperation des emprises BD TOPO
+            "traitement": t_traitement,  # boucle parallele sur les dalles
+            "ecriture":   t_ecriture,    # concat + merge + filtre + ecriture
+            "total":      time.time() - t_total,
+        },
+        "batiments": {
+            "avant_merge_filtre": n_avant,   # avant fusion inter-dalles et filtres
+            "apres_merge":        n_merge,   # apres fusion, avant filtre
+            "final":              n_filtre,  # apres filtre
+        },
+    }
 
 
-            out = traiterDalle(mns_path, mnt_path, gdf_dalle)
-            if out is not None and not out.empty:
-                out.to_file(gpkg_path, driver="GPKG", layer="batiments",
-                        mode="a" if os.path.exists(gpkg_path) else "w") #si le fichier existe pas encore write sinon append
-                    
-            os.remove(mns_path)
-            os.remove(mnt_path)
 
 
-        except Exception as e:
-            print(f"ECHEC dalle {nom_mns} : {e}")
-        
+
+def trait1Dalle(tache):
+    """
+    Traite une dalle dans un worker : telecharge MNS/MNT, calcule, nettoie les fichiers.
+    Definie au niveau module pour rester picklable par ProcessPoolExecutor.
+    --------
+    @param[in] tache : (nom_mnt, url_mnt, nom_mns, url_mns, gdf_dalle)
+
+    @return out, temps : GeoDataFrame de la dalle (None si echec) et dict des durees par etape
+    """
+    temps = {}
+    nom_mnt, url_mnt, nom_mns, url_mns, gdf_dalle = tache
+    temps["nom"] = nom_mns
+    mnt_path = mns_path = None
+    try:
+        t0 = time.perf_counter()
+        with ThreadPoolExecutor(2) as dl:
+            f_mnt = dl.submit(telecharger_fichier, url_mnt, nom_mnt, OUT_DIR_RAW)
+            f_mns = dl.submit(telecharger_fichier, url_mns, nom_mns, OUT_DIR_RAW)
+            mnt_path, mns_path = f_mnt.result(), f_mns.result()
+        temps["telechargement"] = time.perf_counter() - t0
+        return traiterDalle(mns_path, mnt_path, gdf_dalle, temps=temps), temps
+
+    except Exception as e:
+        temps["erreur"] = str(e)
+        return None, temps
+    finally:
+        for pth in (mns_path, mnt_path):           
+            if pth and os.path.exists(pth):
+                os.remove(pth)
 
 
-    #supression filtre fin 
-    if os.path.exists(gpkg_path):
-        t0 = time.time()
-        g = gpd.read_file(gpkg_path)
-        print("nombre bat avant merge+filtre  :", len(g))
 
-        g = mergeCleabs(g)       
-        print("apres merge      :", len(g))
 
-        g = filtrer(g)           
-        print("apres filtre     :", len(g))
-
-        print(f"Filtrage batiment post gpkg : {time.time()-t0:.1f}s")
-
-        g.to_file(gpkg_path, driver="GPKG", layer="batiments")  
-        print(f"Final : {len(g)} batiments")
-        print(f"fichier enregistré  : {nom_zone}{code_dep or ''}.gpkg")
 
 if __name__ == "__main__":
-    t0 = time.time()
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()
-    dt = time.time() - t0
-    print(f"Temps total : {int(dt // 60)} min {dt % 60:.0f} s")
+
+
+
+
+

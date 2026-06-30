@@ -4,3 +4,6 @@ data/
 ancienne_pipeline/
 __pycache__/
 docs/
+build/
+dist/
+*.spec

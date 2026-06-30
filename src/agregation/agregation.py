@@ -38,7 +38,7 @@ def agregerBatiment(df, gdf, hauteur):
         res[f"prod_T{t}_kwh_orp"] = oriente.groupby("id")[f"energie_T{t}"].sum() * PV
 
 
-    res["hauteur_pts"] = hauteur #hauteur a partir du mnh pas bdtopo
+    res["hauteur_pts"] = hauteur   # hauteur issue du MNH, pas de la BD TOPO
 
     res = res.fillna(0.0)                           # mettre des 0 au lieu de NaN
 
@@ -56,19 +56,6 @@ def agregerBatiment(df, gdf, hauteur):
              + [f"prod_T{t}_kwh_orp" for t in range(1, 5)]
              + ["geometry"])
     return out[ordre]
-
-
-def mergerCLeabs_supr(gdf):
-    """
-    Deduplique un batiment a cheval sur 2 dalles en gardant le plus gros morceau.
-    --------
-    @param[in] gdf : sortie de agregerBatiment (plusieurs lignes possibles par cleabs)
-
-    @return GeoDataFrame : 1 ligne par cleabs
-    """
-    return (gdf.sort_values("nb_pixels", ascending=False)
-               .drop_duplicates("cleabs")
-               .reset_index(drop=True))
 
 
 def mergeCleabs(gdf):

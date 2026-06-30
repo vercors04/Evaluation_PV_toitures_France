@@ -1,7 +1,9 @@
 import os, time, requests
 
+from src.config import N_ESSAIS, PAUSE_DL
 
-def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=8, pause=5):
+
+def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=N_ESSAIS, pause=PAUSE_DL):
     """
     Telecharge un fichier en streaming, avec retry + backoff.
     --------
@@ -26,10 +28,9 @@ def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=8, pause=5):
             return chemin  #si tout ok un seul essai
         
 
-        except requests.RequestException as e:
-            print(f"  {nom_fichier} : essai {essai}/{n_essais} echoue ({e})")
+        except requests.RequestException:
             if essai < n_essais:
-                time.sleep(pause * essai)  
+                time.sleep(pause * essai)
                 
     raise RuntimeError(f"echec apres {n_essais} essais : {nom_fichier}")
 
@@ -46,8 +47,7 @@ def liste_telechargement(dictionnaire_resultats):
     """
 
     if 'MNT' not in dictionnaire_resultats or 'MNS' not in dictionnaire_resultats:
-        print('données MNS ou MNT manquantes')
-        return[]
+        return []
     
     dico_mnt={}
     for index,ligne in dictionnaire_resultats['MNT'].iterrows():

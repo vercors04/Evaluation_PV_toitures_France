@@ -7,7 +7,7 @@ import numpy as np
 
 def main(fichier):
     #['cleabs', 'nature', 'usage_1', 'hauteur', 'nombre_d_etages', 'hauteur_pts', 'nb_pixels', 'surf_tot_m2', 'surf_plate_m2', 'surf_incl_m2', 'surf_incl_or_m2', 'pente_moy_incl', 'surf_incl_N_m2', 'surf_incl_NE_m2', 'surf_incl_E_m2', 'surf_incl_SE_m2', 'surf_incl_S_m2', 'surf_incl_SO_m2', 'surf_incl_O_m2', 'surf_incl_NO_m2', 'irr_an_kwh', 'prod_an_kwh', 'irr_an_kwh_orp', 'puissance_kwc_orp', 'prod_an_kwh_orp', 'prod_T1_kwh_orp', 'prod_T2_kwh_orp', 'prod_T3_kwh_orp', 'prod_T4_kwh_orp', 'geometry']
-    gdf=gpd.read_file(f"data/processed/TEST/{fichier}")
+    gdf=gpd.read_file(f"data/processed/gpkg/{fichier}")
     with open("statistiques/bilan_statistiques.md", "w", encoding="utf-8") as f:
         valeurs_surfaces = []
         labels_orientations = []

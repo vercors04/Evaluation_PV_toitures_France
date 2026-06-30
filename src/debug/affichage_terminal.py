@@ -36,8 +36,8 @@ def afficherBilan(bilan):
     echecs = bilan.get("echecs", [])
     if echecs:
         print(f"{len(echecs)} dalle(s) en echec :")
-        for n in echecs:
-            print(f"   - {n}")
+        for e in echecs:
+            print(f"   - {e['nom']} : {e['erreur']}")
 
 
 def progressTerminal(i, total):

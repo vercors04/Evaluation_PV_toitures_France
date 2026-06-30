@@ -1,4 +1,3 @@
-# src/acquisition/dalles.py
 import pandas as pd
 
 from src.acquisition.requetes import lireWFS

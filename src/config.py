@@ -1,10 +1,17 @@
 import numpy as np
-import os
+import sys, os
+
+if getattr(sys, "frozen", False):
+    BASE      = os.path.dirname(sys.executable)  
+    BASE_DATA = sys._MEIPASS                        
+else:
+    BASE      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    BASE_DATA = BASE
 
 #dossiers de sortie/entree 
-OUT_DIR_RAW =  os.path.normpath("data/raw/TEST/dalles")
-OUT_DIR_PROCESSED = os.path.normpath("data/processed/TEST")
-DIR_GEOJSON = os.path.normpath("data/raw/TEST/geojson")
+OUT_DIR_RAW       = os.path.join(BASE, "data", "raw")                   # dalles MNS/MNT (transit)
+DIR_GEOJSON       = os.path.join(BASE, "data", "processed", "geojson")  # contours de zone (.geojson)
+OUT_DIR_PROCESSED = os.path.join(BASE, "data", "processed", "gpkg")     # resultats (.gpkg)
 
 
 #tri toitures
@@ -14,7 +21,13 @@ HAUT_MAX = 35
 
 #WFS
 WFS = "https://data.geopf.fr/wfs/ows"
+N_ESSAIS_WFS = 8   # tentatives par requete WFS
+PAUSE_WFS    = 2   # pause entre tentatives WFS (s)
 N_COEURS = 5
+
+# telechargement des dalles
+N_ESSAIS = 8     # nb de tentatives par fichier avant abandon
+PAUSE_DL = 5     # pause de base entre tentatives (s), croissante
 
 
 #batiments
@@ -31,7 +44,7 @@ N_THREADS = 8
 
 # construction table meteo
 URL     = "https://re.jrc.ec.europa.eu/api/v5_3/"    # PVGIS 5.3 (SARAH-3, 2005-2023)
-DOSSIER = "data/tables"                              # un fichier par cellule meteo
+DOSSIER = os.path.join(BASE_DATA, "data", "tables")
 PAS     = 0.10                                       # pas de la grille meteo (deg) = taille de cellule
 PAUSE   = 0.2                                        # temps entre requete pvgis
 

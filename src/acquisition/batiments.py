@@ -2,7 +2,7 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 
 from src.acquisition.requetes import lireWFS, compter
-from src.config import COUNT, ATTRS_BATI, FILTRES_BATI, N_THREADS, WFS
+from src.config import COUNT, ATTRS_BATI, FILTRES_BATI, N_THREADS
 
 
 def batiments(polygone):

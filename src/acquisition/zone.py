@@ -1,4 +1,3 @@
-# src/acquisition/zone.py
 import requests
 from shapely.geometry import box
 
@@ -23,7 +22,7 @@ def zone(echelle, nom_zone, code_dep=None):
         if gdf.empty:
             return None
         france = gdf.geometry.union_all()                       # (unary_union si vieille version)
-        return france    #.intersection(box(-5.5, 41.0, 10.0, 51.5))  si on veut pas l'outre mer
+        return france    # .intersection(box(-5.5, 41.0, 10.0, 51.5)) pour exclure l'outre-mer
     
 
     if echelle == "adresse":

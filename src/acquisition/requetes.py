@@ -2,10 +2,10 @@ import time
 import requests
 import geopandas as gpd
 
-from src.config import WFS
+from src.config import WFS, N_ESSAIS_WFS, PAUSE_WFS
 
 
-def lireWFS(params, n=8):
+def lireWFS(params, n=N_ESSAIS_WFS):
     """
     Requete WFS GetFeature, renvoie un GeoDataFrame. Reessaie n fois avant d'echouer.
     --------
@@ -23,11 +23,11 @@ def lireWFS(params, n=8):
             err = txt[:200]                              
         except requests.RequestException as e:
             err = str(e)
-        time.sleep(2)
+        time.sleep(PAUSE_WFS)
     raise RuntimeError(f"WFS a echoue {n}x : {err}")
 
 
-def compter(params, n=8):
+def compter(params, n=N_ESSAIS_WFS):
     """
     Nombre d'entites correspondant a la requete WFS (numberMatched). Reessaie n fois.
     --------
@@ -46,6 +46,6 @@ def compter(params, n=8):
             err = r.text[:200]
         except Exception as e:
             err = str(e)
-        time.sleep(2)
+        time.sleep(PAUSE_WFS)
     raise RuntimeError(f"WFS (comptage) a echoue {n}x : {err}")
 
