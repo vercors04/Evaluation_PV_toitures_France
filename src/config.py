@@ -32,10 +32,12 @@ PAUSE_DL = 5     # pause de base entre tentatives (s), croissante
 
 #batiments
 NATURE_OK = ['Indifférenciée', 'Industriel, agricole ou commercial']
+USAGE_OK  = ['Résidentiel', 'Commercial et services', 'Indifférencié', 'Industriel', 'Agricole']
 FILTRES_BATI = {
     "etat_de_l_objet":     "En service",
     "construction_legere": False,
     "nature":              NATURE_OK,
+    "usage_1":             USAGE_OK,
 }
 ATTRS_BATI = ["nature", "usage_1", "hauteur", "nombre_d_etages"]
 COUNT = 5000
