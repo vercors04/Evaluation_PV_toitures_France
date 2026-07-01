@@ -36,7 +36,7 @@ N_JOURS = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])  # jours pa
 TRIM    = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]              # mois (index 0-11) par trimestre
 SECTEURS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"]              # 8 secteurs d'orientation
 
-# colonnes de sortie regroupees par theme (le .gpkg garde les groupes listes dans SORTIE_GARDEES)
+# colonnes de sortie regroupees par theme 
 GROUPES_SORTIE = {
     "hauteur":           ["hauteur_pts"],
     "nb_pixels":         ["nb_pixels"],
