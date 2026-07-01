@@ -219,8 +219,28 @@ def main(fichier):
         plt.savefig("statistiques/graphs/production_trimestre.png", dpi=300, bbox_inches='tight')
         plt.close()
         print("[Représentation graphique de la production par trimestre](graphs/production_trimestre.png)", file=f)
+        
+        
+        print('Comparaison Irradiation Paris, Toulouse et Poitiers==========================================', file=f)
+        donnees = {
+            'Paris': [184133, 183904, 148579],
+            'Poitiers': [152023, 127906, 128997],
+            'Toulouse': [206394, 212251, 148930]
+        }
+        orientations = ['Sud', 'Est/Ouest', 'Nord']
 
+        df = pd.DataFrame(donnees, index=orientations)
 
+        df_pourcentage = (df / df.sum()) * 100
 
+        df_pourcentage.plot.bar(figsize=(8, 5), rot=0, edgecolor='black')
+
+        plt.title("Proportion de l'irradiation selon l'orientation (%)")
+        plt.ylabel("Proportion (%)")
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+        plt.savefig("statistiques/graphs/comparaison_irradiation.png", bbox_inches='tight')
+        plt.close()
+        print("[Comparaison Irradiation Paris, Toulouse et Poitiers](graphs/comparaison_irradiation.png)", file=f)
 if __name__ == "__main__":
-    main('Poitiers86.gpkg')
+    main('Territoire_de_Belfort.gpkg')
