@@ -69,6 +69,23 @@ def boite(parent, titre):
     """
     return ttk.LabelFrame(parent, text=titre)
 
+def radioButtons(parent, libelle, options, defaut):
+    """
+    Un groupe de boutons radio (un seul choix), range automatiquement dans parent.
+    --------
+    @param[in] parent  : la boite ou ranger le groupe
+    @param[in] libelle : texte a gauche
+    @param[in] options : liste des choix possibles
+    @param[in] defaut  : choix coche au depart
+
+    @return StringVar : lire avec .get()
+    """
+    var = tk.StringVar(value=defaut)
+    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
+    ttk.Label(ligne, text=libelle, width=18).pack(side="left")
+    for opt in options:
+        ttk.Radiobutton(ligne, text=opt, variable=var, value=opt).pack(side="left", padx=5)
+    return var
 
 def bouton(parent, texte, action):
     """

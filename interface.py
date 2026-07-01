@@ -43,7 +43,7 @@ if __name__ == "__main__":
     bnw = boite(fen1, "pipeline")
     bnw.grid(row=0, column=0, sticky="nw", padx=10, pady=10)
 
-    menu (bnw, "echelle", ECHELLES, [])
+    zone = menu (bnw, "echelle", ECHELLES, [])
 
 
 
