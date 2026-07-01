@@ -7,7 +7,7 @@ from shapely.prepared import prep
 
 
 from src.irradiance.meteo.grille_fct import telecharger, transpAgr, cheminTable
-from src.config import (PAS, ALPHAS, BETAS, DOSSIER, PAUSE)
+from src import config
 
 
 
@@ -20,11 +20,11 @@ def grilleCellules(polygone):
     @return liste de tuples (lat, lon), alignes sur la meme grille que chargerTable
     """
     minx, miny, maxx, maxy = polygone.bounds
-    snap = lambda v: round(round(v / PAS) * PAS, 2)
-    lats = np.round(np.arange(snap(miny), snap(maxy) + PAS/2, PAS), 2)
-    lons = np.round(np.arange(snap(minx), snap(maxx) + PAS/2, PAS), 2)
+    snap = lambda v: round(round(v / config.PAS) * config.PAS, 2)
+    lats = np.round(np.arange(snap(miny), snap(maxy) + config.PAS/2, config.PAS), 2)
+    lons = np.round(np.arange(snap(minx), snap(maxx) + config.PAS/2, config.PAS), 2)
     dans = prep(polygone)
-    h = PAS / 2
+    h = config.PAS / 2
     return [(la, lo) for la in lats for lo in lons
             if dans.intersects(box(lo - h, la - h, lo + h, la + h))]
 
@@ -42,7 +42,7 @@ def construireCellule(lat, lon):
     os.makedirs(os.path.dirname(chemin), exist_ok=True)          # cree le sous-dossier de la cellule
     np.savez_compressed(chemin, B=B.astype(np.float16), D=D.astype(np.float16),
                         SAZ=SAZ, SEL=SEL,
-                        alphas=ALPHAS, betas=BETAS, lat=lat, lon=lon,
+                        alphas=config.ALPHAS, betas=config.BETAS, lat=lat, lon=lon,
                         source="PVGIS-SARAH3 2005-2023, Perez")
 
 
@@ -54,7 +54,7 @@ def construire(polygone):
     @param[in] polygone : emprise de la zone (shapely, WGS84)
     """
     pts = grilleCellules(polygone)
-    print(f"{len(pts)} cellules a construire dans {DOSSIER}/ (reprise possible)")
+    print(f"{len(pts)} cellules a construire dans {config.DOSSIER}/ (reprise possible)")
     ratees = []
     for k, (lat, lon) in enumerate(pts, 1):
         if os.path.exists(cheminTable(lat, lon)):
@@ -64,5 +64,5 @@ def construire(polygone):
             print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  OK  ({time.time()-t0:.0f} s)")
         except Exception as e:
             print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  ECHEC : {e}"); ratees.append((lat, lon))
-        time.sleep(PAUSE)
+        time.sleep(config.PAUSE)
     print(f"Termine. {len(ratees)} echec(s) : {ratees}")

@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from src.acquisition.zone import zone
 from src.irradiance.meteo.grille_calculs import grilleCellules, construireCellule
 from src.irradiance.meteo.grille_fct import cheminTable
-from src.config import DOSSIER, N_COEURS
+from src import config
 
 
 
@@ -25,7 +25,7 @@ def _faire(cellule):
 
 
 def main():
-    os.makedirs(DOSSIER, exist_ok=True)
+    os.makedirs(config.DOSSIER, exist_ok=True)
 
     print("Choix de l'echelle territoriale:")
     print("0 : Adresse\n1 : Commune\n2 : Departement\n3 : Region\n4 : France")
@@ -51,9 +51,9 @@ def main():
         print("zone introuvable"); return
 
     pts = grilleCellules(polygone)
-    print(f"{len(pts)} cellules a construire dans {DOSSIER}/ sur {N_COEURS} coeurs (reprise possible)")
+    print(f"{len(pts)} cellules a construire dans {config.DOSSIER}/ sur {config.N_COEURS} coeurs (reprise possible)")
     ratees, t0 = [], time.time()
-    with ProcessPoolExecutor(max_workers=N_COEURS) as ex:
+    with ProcessPoolExecutor(max_workers=config.N_COEURS) as ex:
         for k, (lat, lon, etat) in enumerate(ex.map(_faire, pts), 1):
             print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  {etat}")
             if etat.startswith("ECHEC"):

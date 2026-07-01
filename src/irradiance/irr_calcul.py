@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from numba import njit, prange
-from src.config import N_JOURS, ALPHAS, BETAS, TRIM
+from src import config
 
 
 @njit(parallel=True, cache=True)
@@ -74,14 +74,14 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
     a = aspect[toit].astype(np.float32)
     p = pente[toit].astype(np.float32)
 
-    pas_a = float(ALPHAS[1] - ALPHAS[0])           # 15
-    pas_b = float(BETAS[1] - BETAS[0])             # 10
+    pas_a = float(config.ALPHAS[1] - config.ALPHAS[0])   # 15
+    pas_b = float(config.BETAS[1] - config.BETAS[0])     # 10
     ndir  = horizon.shape[1]
     dmh = (np.round(SAZ / (360 / ndir)).astype(np.int64) % ndir)   # (12,24) direction du soleil
     D_h = D.sum(axis=3).astype(np.float32)                          # diffus pre-somme sur l'heure
 
     e_mois = energiePix(a, p, B.astype(np.float32), D_h, horizon.astype(np.float32),
-                     dmh, SEL.astype(np.float32), N_JOURS.astype(np.float32), pas_a, pas_b)
+                     dmh, SEL.astype(np.float32), config.N_JOURS.astype(np.float32), pas_a, pas_b)
 
     surf   = res**2 / np.cos(np.radians(p))
     e_mois = e_mois * surf[:, None]                 # (N,12) kWh
@@ -95,6 +95,6 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
         "incline":    incline[toit],
         "incline_or": incline_or[toit],
     })
-    for t, mois in enumerate(TRIM, start=1):
+    for t, mois in enumerate(config.TRIM, start=1):
         df[f"energie_T{t}"] = e_mois[:, mois].sum(axis=1)
     return df

@@ -2,7 +2,7 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 
 from src.acquisition.requetes import lireWFS, compter
-from src.config import COUNT, ATTRS_BATI, FILTRES_BATI, N_THREADS
+from src import config
 
 
 def batiments(polygone):
@@ -21,9 +21,9 @@ def batiments(polygone):
         "REQUEST": "GetFeature",
         "TYPENAME": "BDTOPO_V3:batiment",
         "OUTPUTFORMAT": "application/json",
-        "PROPERTYNAME": ",".join(dict.fromkeys(["cleabs", "geometrie"] + list(FILTRES_BATI) + ATTRS_BATI)),
+        "PROPERTYNAME": ",".join(dict.fromkeys(["cleabs", "geometrie"] + list(config.FILTRES_BATI) + config.ATTRS_BATI)),
         "CQL_FILTER": f"BBOX(geometrie,{miny},{minx},{maxy},{maxx})",
-        "COUNT": COUNT,
+        "COUNT": config.COUNT,
     }
 
 
@@ -32,15 +32,15 @@ def batiments(polygone):
         return None
 
 
-    with ThreadPoolExecutor(max_workers=N_THREADS) as ex:
-        morceaux = list(ex.map(lambda s: lireWFS({**params, "STARTINDEX": s}), range(0, n, COUNT)))
+    with ThreadPoolExecutor(max_workers=config.N_THREADS) as ex:
+        morceaux = list(ex.map(lambda s: lireWFS({**params, "STARTINDEX": s}), range(0, n, config.COUNT)))
 
 
     tout = pd.concat(morceaux, ignore_index=True)
     tout = tout[tout.geometry.representative_point().within(polygone)]
-    for col, val in FILTRES_BATI.items():
+    for col, val in config.FILTRES_BATI.items():
         tout = tout[tout[col].isin(val) if isinstance(val, (list, tuple, set)) else tout[col] == val]
-    return (tout[["cleabs", *ATTRS_BATI, "geometry"]]
+    return (tout[["cleabs", *config.ATTRS_BATI, "geometry"]]
             .reset_index(drop=True).to_crs(2154))
 
 

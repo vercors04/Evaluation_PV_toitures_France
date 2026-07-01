@@ -2,50 +2,50 @@ import time
 import requests
 import geopandas as gpd
 
-from src.config import WFS, N_ESSAIS_WFS, PAUSE_WFS
+from src import config
 
 
-def lireWFS(params, n=N_ESSAIS_WFS):
+def lireWFS(params):
     """
-    Requete WFS GetFeature, renvoie un GeoDataFrame. Reessaie n fois avant d'echouer.
+    Requete WFS GetFeature, renvoie un GeoDataFrame. Reessaie config.N_ESSAIS_WFS fois avant d'echouer.
     --------
     @param[in] params : parametres de la requete WFS
-    @param[in] n      : nombre de tentatives
 
-    @return GeoDataFrame du resultat (leve RuntimeError apres n echecs)
+    @return GeoDataFrame du resultat (leve RuntimeError apres tous les echecs)
     """
+    n = config.N_ESSAIS_WFS
     err = ""
     for _ in range(n):
         try:
-            txt = requests.get(WFS, params=params, timeout=120).text
-            if "FeatureCollection" in txt[:300]:          
+            txt = requests.get(config.WFS, params=params, timeout=120).text
+            if "FeatureCollection" in txt[:300]:
                 return gpd.read_file(txt)
-            err = txt[:200]                              
+            err = txt[:200]
         except requests.RequestException as e:
             err = str(e)
-        time.sleep(PAUSE_WFS)
+        time.sleep(config.PAUSE_WFS)
     raise RuntimeError(f"WFS a echoue {n}x : {err}")
 
 
-def compter(params, n=N_ESSAIS_WFS):
+def compter(params):
     """
-    Nombre d'entites correspondant a la requete WFS (numberMatched). Reessaie n fois.
+    Nombre d'entites correspondant a la requete WFS (numberMatched). Reessaie config.N_ESSAIS_WFS fois.
     --------
     @param[in] params : parametres de la requete WFS
-    @param[in] n      : nombre de tentatives
 
-    @return nombre d'entites (leve RuntimeError apres n echecs)
+    @return nombre d'entites (leve RuntimeError apres tous les echecs)
     """
+    n = config.N_ESSAIS_WFS
     err = ""
     for _ in range(n):
         try:
-            r = requests.get(WFS, {**params, "COUNT": 1}, timeout=120)
+            r = requests.get(config.WFS, {**params, "COUNT": 1}, timeout=120)
             j = r.json()
             if "numberMatched" in j:
                 return j["numberMatched"]
             err = r.text[:200]
         except Exception as e:
             err = str(e)
-        time.sleep(PAUSE_WFS)
+        time.sleep(config.PAUSE_WFS)
     raise RuntimeError(f"WFS (comptage) a echoue {n}x : {err}")
 

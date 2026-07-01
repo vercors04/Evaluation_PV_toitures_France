@@ -2,18 +2,17 @@ import numpy as np
 from rasterio.features import rasterize
 from scipy.ndimage import binary_erosion
 
-from src.config import BUFFER, MNH_MIN, PENTE_PLAT, PENTE_MAX, AZ_MIN, AZ_MAX
+from src import config
 
 
-def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
+def extractGeom(mns, mnt, gdf, meta):
     """
     Geometrie des toitures depuis MNS, MNT et BD TOPO (sans seuils de selection).
+    Tampon config.BUFFER autour des batiments, hauteur min config.MNH_MIN.
     --------
     @param[in] mns, mnt : tableaux 2D de la dalle (NaN hors donnees)
     @param[in] gdf      : GeoDataFrame BD TOPO filtre (index 0..n-1)
     @param[in] meta     : profil rasterio (cles "transform" et "resolution")
-    @param[in] buffer   : tampon autour des batiments (m)
-    @param[in] mnh_min  : hauteur min au-dessus du sol pour etre un toit (m)
 
     @return pente, aspect : 2D float (deg), NaN hors pixels de toit valides
     @return masque_bat    : 2D int, index gdf + 1 du batiment (0 hors toit valide)
@@ -22,10 +21,10 @@ def extractGeom(mns, mnt, gdf, meta, buffer=BUFFER, mnh_min=MNH_MIN):
     mnh = mns - mnt
 
     masque_bat = rasterize(
-        zip(gdf.geometry.buffer(buffer), gdf.index + 1),    # 0 = fond
+        zip(gdf.geometry.buffer(config.BUFFER), gdf.index + 1),    # 0 = fond
         out_shape=mns.shape, transform=meta["transform"], fill=0, dtype="int32")
 
-    pts_ok = (masque_bat > 0) & (mnh >= mnh_min) & np.isfinite(mns) & np.isfinite(mnt)
+    pts_ok = (masque_bat > 0) & (mnh >= config.MNH_MIN) & np.isfinite(mns) & np.isfinite(mnt)
 
     dz_dligne, dz_dcol = np.gradient(mns, meta["resolution"])
     pente  = np.degrees(np.arctan(np.hypot(dz_dcol, dz_dligne)))
@@ -48,12 +47,12 @@ def makeMasques(pente, aspect, masque_bat):
     @param[in] pente, aspect : 2D float (deg), NaN hors toit valide
     @param[in] masque_bat    : 2D int, index gdf + 1 (0 hors toit valide)
 
-    @return incline_or : 2D bool, incline et oriente (azimut AZ_MIN..AZ_MAX)
-    @return incline    : 2D bool, incline toutes orientations (PENTE_PLAT..PENTE_MAX)
-    @return plat       : 2D bool, plat (< PENTE_PLAT)
+    @return incline_or : 2D bool, incline et oriente (azimut config.AZ_MIN..AZ_MAX)
+    @return incline    : 2D bool, incline toutes orientations (config.PENTE_PLAT..PENTE_MAX)
+    @return plat       : 2D bool, plat (< config.PENTE_PLAT)
     """
     valid      = masque_bat > 0
-    incline    = valid & (pente >= PENTE_PLAT) & (pente <= PENTE_MAX)
-    incline_or = incline & (aspect >= AZ_MIN) & (aspect <= AZ_MAX)
-    plat       = valid & (pente < PENTE_PLAT)
+    incline    = valid & (pente >= config.PENTE_PLAT) & (pente <= config.PENTE_MAX)
+    incline_or = incline & (aspect >= config.AZ_MIN) & (aspect <= config.AZ_MAX)
+    plat       = valid & (pente < config.PENTE_PLAT)
     return incline_or, incline, plat

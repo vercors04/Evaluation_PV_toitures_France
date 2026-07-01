@@ -2,42 +2,16 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 import math
 
-ATTRS_BDTOPO = ['nature', 'usage_1', 'usage_2', 'construction_legere',       
-    'etat_de_l_objet', 'nombre_de_logements', 'nombre_d_etages',           
-    'materiaux_des_murs', 'materiaux_de_la_toiture', 'hauteur',                   
-    'altitude_minimale_sol', 'altitude_minimale_toit', 'altitude_maximale_sol',
-    'altitude_maximale_toit', 'date_creation', 'date_modification',
-]
 
-NATURES = ['Indifférenciée', 'Industriel, agricole ou commercial',
-           'Religieux', 'Sportif', 'Château', 'Serre', 'Silo']  
+def onglets(parent):
+    """Cree un bloc a onglets (Notebook), a placer avec .pack/.grid."""
+    return ttk.Notebook(parent)
 
-USAGE_1 = ['Agricole', 'Annexe', 'Commercial et services', 
-           'Indifférencié', 'Industriel', 'Religieux', 
-           'Résidentiel', 'Sportif']
-
-ECHELLES = ['Adresse', 'Commune ou ville', 'Departement', 'Region', 'France']
-
-SECTEURS          = ["N","NE","E","SE","S","SO","O","NO"]          
-GROUPES_SORTIE = {
-    "hauteur":         ["hauteur_pts"],
-    "nb_pixels":        ["nb_pixels"],
-    "surf_tot_m2":      ["surf_tot_m2"],
-    "surf_plate_m2":    ["surf_plate_m2"],
-    "surf_incl_m2":     ["surf_incl_m2"],
-    "surf_incl_or_m2":  ["surf_incl_or_m2"],
-    "pente_moy_incl":   ["pente_moy_incl"],
-    "surfaces_orient": [f"surf_incl_{s}_m2" for s in SECTEURS],
-    "irr_an_kwh":      ["irr_an_kwh"],
-    "prod_an_kwh":      ["prod_an_kwh"],
-    "irr_an_kwh_orp":   ["irr_an_kwh_orp"],
-    "puissance_kwc_orp": ["puissance_kwc_orp"],
-    "prod_an_kwh_orp":  ["prod_an_kwh_orp"],
-    "production_trim": [f"prod_T{t}_kwh_orp" for t in range(1, 5)],
-}
-    
-
-
+def onglet(notebook, titre):
+    """Cree un onglet (Frame) et l'ajoute au notebook."""
+    f = ttk.Frame(notebook)
+    notebook.add(f, text=titre)
+    return f
 
 
 def fenetre(titre="", largeur=600, hauteur=400):
@@ -69,35 +43,27 @@ def boite(parent, titre):
     """
     return ttk.LabelFrame(parent, text=titre)
 
-def radioButtons(parent, libelle, options, defaut):
+def radioBoutons(parent, libelle, options, defaut, on_change=None):
     """
-    Un groupe de boutons radio (un seul choix), range automatiquement dans parent.
+    Un groupe de boutons radio (un seul choix a la fois).
     --------
-    @param[in] parent  : la boite ou ranger le groupe
-    @param[in] libelle : texte a gauche
-    @param[in] options : liste des choix possibles
-    @param[in] defaut  : choix coche au depart
+    @param[in] parent    : conteneur ou ranger le groupe
+    @param[in] libelle   : titre affiche au-dessus
+    @param[in] options   : liste des choix
+    @param[in] defaut    : choix selectionne au depart
+    @param[in] on_change : fonction appelee a chaque changement de choix (optionnel)
 
-    @return StringVar : lire avec .get()
+    @return StringVar : lire le choix courant avec .get()
     """
+    ttk.Label(parent, text=libelle).pack(anchor="w", pady=(4, 0))
     var = tk.StringVar(value=defaut)
-    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
-    ttk.Label(ligne, text=libelle, width=18).pack(side="left")
+    cb = ttk.Frame(parent)
+    cb.pack(anchor="w", fill="x")
+    
     for opt in options:
-        ttk.Radiobutton(ligne, text=opt, variable=var, value=opt).pack(side="left", padx=5)
+        ttk.Radiobutton(cb, text=opt, value=opt, variable=var,
+                        command=on_change).pack(side="left", padx=5)
     return var
-
-def bouton(parent, texte, action):
-    """
-    Cree un bouton qui lance une fonction au clic.
-    --------
-    @param[in] parent : conteneur
-    @param[in] texte  : texte affiche sur le bouton
-    @param[in] action : fonction appelee au clic (sans argument)
-
-    @return Button : a placer avec .grid(...)
-    """
-    return ttk.Button(parent, text=texte, command=action)
 
 
 def barre_progression(parent):
@@ -141,6 +107,21 @@ def champ(parent, libelle, defaut):
     return e
 
 
+def champ2(parent, libelle, defaut):
+    """
+    Une ligne 'libelle : [case texte]', rangee automatiquement dans parent.
+    --------
+    @param[in] parent  : la boite ou ranger ce champ
+    @param[in] libelle : texte a gauche
+    @param[in] defaut  : valeur pre-remplie
+
+    @return Entry : lire avec .get() (renvoie du texte, a convertir en int/float)
+    """
+    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
+    ttk.Label(ligne, text=libelle, width=35).pack(side="left")
+    e = ttk.Entry(ligne); e.insert(0, str(defaut)); e.pack(side="left", fill="x", expand=True)
+    return e
+
 def case(parent, libelle, defaut):
     """
     Une case a cocher (oui/non), rangee automatiquement dans parent.
@@ -154,24 +135,6 @@ def case(parent, libelle, defaut):
     var = tk.BooleanVar(value=defaut)
     ttk.Checkbutton(parent, text=libelle, variable=var).pack(anchor="w", pady=2)
     return var
-
-
-def menu(parent, libelle, options, defaut):
-    """
-    Un menu deroulant (un seul choix), range automatiquement dans parent.
-    --------
-    @param[in] parent  : la boite ou ranger le menu
-    @param[in] libelle : texte a gauche
-    @param[in] options : liste des choix possibles
-    @param[in] defaut  : choix affiche au depart
-
-    @return Combobox : lire avec .get()
-    """
-    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
-    ttk.Label(ligne, text=libelle, width=18).pack(side="left")
-    combo = ttk.Combobox(ligne, values=options, state="readonly"); combo.set(defaut)
-    combo.pack(side="left", fill="x", expand=True)
-    return combo
 
 
 
@@ -222,3 +185,5 @@ def menu_coches(parent, libelle, options, defaut):
     btn.configure(command=ouvrir)
     maj_texte()
     return variables
+
+

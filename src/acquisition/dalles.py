@@ -1,7 +1,7 @@
 import pandas as pd
 
 from src.acquisition.requetes import lireWFS
-from src.config import COUNT
+from src import config
 
 def dalles(polygone):
     """
@@ -20,14 +20,14 @@ def dalles(polygone):
             params = {"SERVICE":"WFS","VERSION":"2.0.0","REQUEST":"GetFeature",
                       "TYPENAME": f"IGNF_{couche}-LIDAR-HD:dalle", "OUTPUTFORMAT":"application/json",
                       "CQL_FILTER": f"BBOX(geom,{miny},{minx},{maxy},{maxx})",
-                      "COUNT": COUNT, "STARTINDEX": start}
+                      "COUNT": config.COUNT, "STARTINDEX": start}
             g = lireWFS(params)
             if g.empty:
                 break
             morceaux.append(g)
-            if len(g) < COUNT:
+            if len(g) < config.COUNT:
                 break
-            start += COUNT
+            start += config.COUNT
         if morceaux:
             tout = pd.concat(morceaux, ignore_index=True)
             res[couche] = tout[tout.intersects(polygone)].drop_duplicates("name")

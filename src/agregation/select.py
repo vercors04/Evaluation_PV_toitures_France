@@ -1,5 +1,5 @@
 import pandas as pd
-from src.config import SURF_MIN, HAUT_MIN, HAUT_MAX
+from src import config
 
 
 def hBat(mnh, masque_bat, q=0.95):
@@ -17,15 +17,16 @@ def hBat(mnh, masque_bat, q=0.95):
     return h.groupby("id").mnh.quantile(q)       
 
 
-def filtrer(gdf, surf_min=SURF_MIN, haut_min=HAUT_MIN, haut_max=HAUT_MAX):
+def filtrer(gdf):
     """
     Garde les batiments assez grands et dans une plage de hauteur plausible.
+    Seuils : config.SURF_MIN, config.HAUT_MIN, config.HAUT_MAX.
     --------
-    @param[in] gdf                : GeoDataFrame de sortie (1 ligne par batiment)
-    @param[in] surf_min           : surface totale minimale (m2)
-    @param[in] haut_min, haut_max : bornes de hauteur mesuree (m)
+    @param[in] gdf : GeoDataFrame de sortie (1 ligne par batiment)
 
     @return GeoDataFrame filtre
     """
-    return gdf[(gdf.surf_tot_m2 >= surf_min) & (gdf.hauteur_pts >= haut_min) & (gdf.hauteur_pts <= haut_max)].copy()
+    return gdf[(gdf.surf_tot_m2 >= config.SURF_MIN)
+               & (gdf.hauteur_pts >= config.HAUT_MIN)
+               & (gdf.hauteur_pts <= config.HAUT_MAX)].copy()
 

@@ -1,19 +1,20 @@
 import numpy as np
 from numba import njit, prange
-from src.config import N_DIRECTIONS, DIST_MAX_M, CAP
 
 
 @njit(parallel=True, cache=True)
-def compHZ(mns, masque_toiture, res, n_directions=N_DIRECTIONS, max_distance_m=DIST_MAX_M):
+def compHZ(mns, masque_toiture, res, n_directions, max_distance_m, cap):
     """
     Angle d'horizon par pixel de toit, dans n_directions directions (raycast, numba).
     Pour chaque pixel et direction : avance le long du rayon et garde la pente max.
+    Les reglages sont passes en arguments (pas de global) : le cache numba reste valide.
     --------
     @param[in] mns            : 2D float de la dalle (NaN hors donnees)
     @param[in] masque_toiture : 2D bool, True sur les pixels de toit
     @param[in] res            : taille du pixel (m)
     @param[in] n_directions   : nombre de directions azimutales
     @param[in] max_distance_m : rayon de recherche (m)
+    @param[in] cap            : plafond solaire, pente max prise en compte (deg)
 
     @return horizon : (N_pixels_toit, n_directions) angle d'horizon (deg), ordre np.where(masque_toiture),
                       convention boussole 000=N, 090=E, 180=S, 270=O
@@ -21,7 +22,7 @@ def compHZ(mns, masque_toiture, res, n_directions=N_DIRECTIONS, max_distance_m=D
     H, W = mns.shape
     max_dist_px = int(max_distance_m / res)
     step = 360 // n_directions
-    tan_cap = np.tan(np.radians(CAP))
+    tan_cap = np.tan(np.radians(cap))
 
 
     zmax = -1e30

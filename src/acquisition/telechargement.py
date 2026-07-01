@@ -1,20 +1,19 @@
 import os, time, requests
 
-from src.config import N_ESSAIS, PAUSE_DL
+from src import config
 
 
-def telecharger_fichier(url, nom_fichier, dossier_dest, n_essais=N_ESSAIS, pause=PAUSE_DL):
+def telecharger_fichier(url, nom_fichier, dossier_dest):
     """
-    Telecharge un fichier en streaming, avec retry + backoff.
+    Telecharge un fichier en streaming, avec retry + backoff (config.N_ESSAIS, config.PAUSE_DL).
     --------
     @param[in] url          : lien HTTP(S) du fichier
     @param[in] nom_fichier  : nom du fichier sur le disque
     @param[in] dossier_dest : dossier cible (cree si absent)
-    @param[in] n_essais     : nombre de tentatives avant abandon
-    @param[in] pause        : pause de base entre essais (s), croissante
 
-    @return chemin : chemin local du fichier (leve RuntimeError apres n_essais echecs)
+    @return chemin : chemin local du fichier (leve RuntimeError apres config.N_ESSAIS echecs)
     """
+    n_essais, pause = config.N_ESSAIS, config.PAUSE_DL
     os.makedirs(dossier_dest, exist_ok=True)
     chemin = os.path.join(dossier_dest, nom_fichier)
 

@@ -1,4 +1,5 @@
 data/
+settings.json
 .claude/
 .vscode/
 ancienne_pipeline/
@@ -6,4 +7,3 @@ __pycache__/
 docs/
 build/
 dist/
-*.spec

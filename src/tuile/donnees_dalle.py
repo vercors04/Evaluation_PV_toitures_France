@@ -1,5 +1,7 @@
 from pyproj import Transformer
 
+_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 -> WGS84 (reutilisable)
+
 
 def nomCoord(mns_name):
     """
@@ -22,8 +24,7 @@ def centreWGS84(x_km, y_km):
     @return lat, lon : centre de la tuile (deg WGS84)
     """
     xc, yc = x_km * 1000 + 500, y_km * 1000 - 500       # -500 : le nom IGN donne le coin NORD-ouest
-    tr = Transformer.from_crs(2154, 4326, always_xy=True)
-    lon, lat = tr.transform(xc, yc)
+    lon, lat = _TR_L93_WGS84.transform(xc, yc)
     return lat, lon
 
 
