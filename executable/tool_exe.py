@@ -1,6 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
+import math
 
+ATTRS_BDTOPO = ['nature', 'usage_1', 'usage_2', 'construction_legere',       
+    'etat_de_l_objet', 'nombre_de_logements', 'nombre_d_etages',           
+    'materiaux_des_murs', 'materiaux_de_la_toiture', 'hauteur',                   
+    'altitude_minimale_sol', 'altitude_minimale_toit', 'altitude_maximale_sol',
+    'altitude_maximale_toit', 'date_creation', 'date_modification',
+]
 
 NATURES = ['Indifférenciée', 'Industriel, agricole ou commercial',
            'Religieux', 'Sportif', 'Château', 'Serre', 'Silo']  
@@ -10,6 +17,28 @@ USAGE_1 = ['Agricole', 'Annexe', 'Commercial et services',
            'Résidentiel', 'Sportif']
 
 ECHELLES = ['Adresse', 'Commune ou ville', 'Departement', 'Region', 'France']
+
+SECTEURS          = ["N","NE","E","SE","S","SO","O","NO"]          
+GROUPES_SORTIE = {
+    "hauteur":         ["hauteur_pts"],
+    "nb_pixels":        ["nb_pixels"],
+    "surf_tot_m2":      ["surf_tot_m2"],
+    "surf_plate_m2":    ["surf_plate_m2"],
+    "surf_incl_m2":     ["surf_incl_m2"],
+    "surf_incl_or_m2":  ["surf_incl_or_m2"],
+    "pente_moy_incl":   ["pente_moy_incl"],
+    "surfaces_orient": [f"surf_incl_{s}_m2" for s in SECTEURS],
+    "irr_an_kwh":      ["irr_an_kwh"],
+    "prod_an_kwh":      ["prod_an_kwh"],
+    "irr_an_kwh_orp":   ["irr_an_kwh_orp"],
+    "puissance_kwc_orp": ["puissance_kwc_orp"],
+    "prod_an_kwh_orp":  ["prod_an_kwh_orp"],
+    "production_trim": [f"prod_T{t}_kwh_orp" for t in range(1, 5)],
+}
+    
+
+
+
 
 def fenetre(titre="", largeur=600, hauteur=400):
     """
@@ -132,7 +161,8 @@ def menu(parent, libelle, options, defaut):
 
 def menu_coches(parent, libelle, options, defaut):
     """
-    Un bouton qui ouvre un panneau de cases a cocher (compact). Le bouton affiche le nombre coche.
+    Un bouton qui ouvre un panneau de cases a cocher (compact, une seule fenetre a la fois).
+    Au-dela de 5 options, elles sont reparties en colonnes cote a cote.
     --------
     @param[in] parent  : la boite ou ranger
     @param[in] libelle : texte a gauche
@@ -146,20 +176,32 @@ def menu_coches(parent, libelle, options, defaut):
     ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     ttk.Label(ligne, text=libelle, width=18).pack(side="left")
     btn = ttk.Button(ligne); btn.pack(side="left")
+    etat = {"pop": None}                              
 
-    def maj_texte():                                   # met a jour le compteur sur le bouton
+    def maj_texte():
         n = sum(v.get() for v in variables.values())
         btn.configure(text=f"{n} sélectionné(s)  ▾")
 
-    def ouvrir():                                      # ouvre le panneau au clic
-        pop = tk.Toplevel(btn)
+    def ouvrir():
+        if etat["pop"] is not None and etat["pop"].winfo_exists():
+            etat["pop"].lift()
+            return
+
+        pop = tk.Toplevel(btn); etat["pop"] = pop
         pop.title(libelle)
-        pop.transient(btn.winfo_toplevel())            # reste au-dessus de la fenetre
-        pop.geometry(f"+{btn.winfo_rootx()}+{btn.winfo_rooty() + btn.winfo_height()}")  # juste sous le bouton
-        for opt, v in variables.items():
-            ttk.Checkbutton(pop, text=opt, variable=v, command=maj_texte).pack(anchor="w", padx=10, pady=2)
-        ttk.Button(pop, text="OK", command=pop.destroy).pack(pady=6)
+        pop.transient(btn.winfo_toplevel())
+        pop.geometry(f"+{btn.winfo_rootx()}+{btn.winfo_rooty() + btn.winfo_height()}")
+
+        opts    = list(variables.items())
+        ncols   = math.ceil(len(opts) / 5)             
+        par_col = math.ceil(len(opts) / ncols)        
+        for idx, (opt, v) in enumerate(opts):
+            ttk.Checkbutton(pop, text=opt, variable=v, command=maj_texte).grid(
+                row=idx % par_col, column=idx // par_col, sticky="w", padx=10, pady=2)
+
+        ttk.Button(pop, text="OK", command=pop.destroy).grid(
+            row=par_col, column=0, columnspan=ncols, pady=6)
 
     btn.configure(command=ouvrir)
-    maj_texte()                                        # affiche le compte de depart
+    maj_texte()
     return variables

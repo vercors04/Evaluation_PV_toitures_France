@@ -76,3 +76,22 @@ TAUX_COUVERTURE   = 1.0                                            # part de toi
 SECTEURS          = ["N","NE","E","SE","S","SO","O","NO"]          
 TRIM = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
 
+
+#pour la sortie gpkg
+GROUPES_SORTIE = {
+    "hauteur":         ["hauteur_pts"],
+    "nb_pixels":        ["nb_pixels"],
+    "surf_tot_m2":      ["surf_tot_m2"],
+    "surf_plate_m2":    ["surf_plate_m2"],
+    "surf_incl_m2":     ["surf_incl_m2"],
+    "surf_incl_or_m2":  ["surf_incl_or_m2"],
+    "pente_moy_incl":   ["pente_moy_incl"],
+    "surfaces_orient": [f"surf_incl_{s}_m2" for s in SECTEURS],
+    "irr_an_kwh":      ["irr_an_kwh"],
+    "prod_an_kwh":      ["prod_an_kwh"],
+    "irr_an_kwh_orp":   ["irr_an_kwh_orp"],
+    "puissance_kwc_orp": ["puissance_kwc_orp"],
+    "prod_an_kwh_orp":  ["prod_an_kwh_orp"],
+    "production_trim": [f"prod_T{t}_kwh_orp" for t in range(1, 5)],
+},
+SORTIE_GARDEES = list(GROUPES_SORTIE)

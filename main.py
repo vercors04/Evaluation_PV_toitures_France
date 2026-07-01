@@ -15,7 +15,7 @@ from src.acquisition.batiments import batiments
 from src.acquisition.zone import zone
 from src.acquisition.dalles import dalles
 from src.debug.affichage_terminal import afficherBilan, progressTerminal
-from src.config import OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON, N_COEURS
+from src.config import ATTRS_BATI, GROUPES_SORTIE, OUT_DIR_PROCESSED, OUT_DIR_RAW, DIR_GEOJSON, N_COEURS, SORTIE_GARDEES
 
 
 
@@ -134,7 +134,11 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     n_avant = len(g)
     g = mergeCleabs(g);  n_merge  = len(g)
     g = filtrer(g);      n_filtre = len(g)
-
+    cols = (["cleabs"] + ATTRS_BATI
+            + [c for grp in SORTIE_GARDEES for c in GROUPES_SORTIE[grp]]
+            + ["geometry"])
+    g = g[[c for c in cols if c in g.columns]] 
+    
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
     g.to_file(gpkg_path, driver="GPKG", layer="batiments")
