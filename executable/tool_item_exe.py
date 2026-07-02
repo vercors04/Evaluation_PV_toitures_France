@@ -130,7 +130,7 @@ def case(parent, libelle, defaut):
     @param[in] libelle : texte a cote de la case
     @param[in] defaut  : True/False coche au depart
 
-    @return BooleanVar : lire avec .get() -> True/False
+    @return BooleanVar : lire avec .get() (True/False)
     """
     var = tk.BooleanVar(value=defaut)
     ttk.Checkbutton(parent, text=libelle, variable=var).pack(anchor="w", pady=2)
@@ -158,7 +158,7 @@ def menuCoches(parent, libelle, options, defaut):
     btn = ttk.Button(ligne); btn.pack(side="left")
     etat = {"pop": None}                              
 
-    def maj_texte():
+    def majTexte():
         n = sum(v.get() for v in variables.values())
         btn.configure(text=f"{n} sélectionné(s)  ▾")
 
@@ -176,14 +176,14 @@ def menuCoches(parent, libelle, options, defaut):
         ncols   = math.ceil(len(opts) / 5)             
         par_col = math.ceil(len(opts) / ncols)        
         for idx, (opt, v) in enumerate(opts):
-            ttk.Checkbutton(pop, text=opt, variable=v, command=maj_texte).grid(
+            ttk.Checkbutton(pop, text=opt, variable=v, command=majTexte).grid(
                 row=idx % par_col, column=idx // par_col, sticky="w", padx=10, pady=2)
 
         ttk.Button(pop, text="OK", command=pop.destroy).grid(
             row=par_col, column=0, columnspan=ncols, pady=6)
 
     btn.configure(command=ouvrir)
-    maj_texte()
+    majTexte()
     return variables
 
 

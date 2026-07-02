@@ -10,7 +10,12 @@ from executable.tool_fct_exe import afficherBilan
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()   
+    multiprocessing.freeze_support()
+
+    os.makedirs(config.DIR_GEOJSON, exist_ok=True)
+    os.makedirs(config.OUT_DIR_PROCESSED, exist_ok=True)
+    os.makedirs(config.OUT_DIR_RAW, exist_ok=True)
+
     fen1=fenetre("roofTool", 1000, 500)
     fen1.iconbitmap(os.path.join(config.BASE_DATA, "executable", "logo.ico"))
 
@@ -43,7 +48,7 @@ if __name__ == "__main__":
                                 config.ATTRS_BDTOPO,
                                 ["nature", "usage_1", "nombre_d_etages"])
 
-    etat = menuCoches (bpg, "Etat", ["En service", "En construction", "En ruines", "Detruit"], "En service")
+    etat = menuCoches(bpg, "Etat", config.ETATS, ["En service"])
     nature = menuCoches(bpg, "Natures gardees", config.NATURES,
                                 ['Indifférenciée', 'Industriel, agricole ou commercial'])
     usage_1 = menuCoches(bpg, "Usages gardees", config.USAGE_1,
@@ -61,7 +66,7 @@ if __name__ == "__main__":
     champs = {}  
 
 
-    #on récupère les champs de sortie suivant le choix de l'utilisateur 
+    #on reconstruit les champs de saisie de la zone selon l'echelle choisie
 
     def rebuild():                                  
         for w in sous.winfo_children():             
@@ -195,12 +200,12 @@ if __name__ == "__main__":
         entiers = {
             "SURF_MIN": surf_min, "HAUT_MIN": haut_min, "HAUT_MAX": haut_max,
             "AZ_MIN": az_min, "AZ_MAX": az_max, "PENTE_PLAT": pente_plat, "PENTE_MAX": pente_max,
-            "N_ESSAIS_WFS": n_essais_wfs, "PAUSE_WFS": pause_wfs, "N_COEURS": n_coeurs,
-            "N_THREADS": n_threads, "COUNT": count, "N_ESSAIS": n_essais, "PAUSE_DL": pause_dl,
+            "N_ESSAIS_WFS": n_essais_wfs, "N_COEURS": n_coeurs,
+            "N_THREADS": n_threads, "COUNT": count, "N_ESSAIS": n_essais,
             "N_DIRECTIONS": n_directions, "DIST_MAX_M": dist_max_m,
         }
         flottants = {
-            "BUFFER": buffer, "MNH_MIN": mnh_min, "CAP": cap,
+            "BUFFER": buffer, "MNH_MIN": mnh_min, "CAP": cap, "PAUSE_WFS": pause_wfs, "PAUSE_DL": pause_dl,
             "RENDEMENT_MODULE": rendement_module, "PERFORMANCE_RATIO": performance_ratio,
             "TAUX_COUVERTURE": taux_couverture,
         }
@@ -244,6 +249,8 @@ if __name__ == "__main__":
                 raise ValueError("Sélectionnez une suggestion dans la liste (nom + code).")
             nom, code = texte.rsplit("(", 1)
             return "departement", nom.strip(), None
+        
+        raise ValueError(f"Problème echelle pas connue : {choix}") #au cas ou (vraiment au cas ou)
 
 
     bl = boite(cg, "lancement") #boite lancement
@@ -291,14 +298,14 @@ if __name__ == "__main__":
 
 
     def lancerPipeline(echelle, nom_zone, code_dep):
-        def on_log(msg):
+        def onLog(msg):
             q.put(("log", msg))
 
-        def on_progress(i, total):
+        def onProgress(i, total):
             q.put(("progress", i, total))
 
         try:
-            bilan = runPipeline(echelle, nom_zone, code_dep, on_progress=on_progress, on_log=on_log)
+            bilan = runPipeline(echelle, nom_zone, code_dep, on_progress=onProgress, on_log=onLog)
             q.put(("done", bilan))
         except Exception as e:
             q.put(("error", str(e)))

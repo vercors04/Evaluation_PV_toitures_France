@@ -28,7 +28,7 @@ def energiePix(a, p, B, D_h, horizon, dmh, SEL, NJ, pas_a, pas_b):
         # poids bilineaires (orientation, pente), calcules une fois
         fa = a[n] / pas_a
         i0 = int(np.floor(fa)) % nalpha                   # azimut : indice bas
-        i1 = (i0 + 1) % nalpha                            #          indice haut (boucle 345->0)
+        i1 = (i0 + 1) % nalpha                            #          indice haut (revient a 0 apres 345)
         wa = fa - np.floor(fa)
         fb = p[n] / pas_b
         fb = 0.0 if fb < 0 else (nbeta - 1.0 if fb > nbeta - 1 else fb)   # pente bornee a la grille

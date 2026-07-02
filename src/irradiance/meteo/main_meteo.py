@@ -1,5 +1,5 @@
 """
-    python -m src.irradiance.meteo.main_meteo_parallele
+    python -m src.irradiance.meteo.main_meteo
 """
 import os
 import time

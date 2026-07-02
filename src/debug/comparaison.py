@@ -3,8 +3,8 @@ src/debug/comparaison.py
 
 Aide a choisir les parametres des cellules meteo. Trois parties :
 
-  1. TAILLE -> ERREUR : sur 3 sites (montagne, littoral, plaine), de combien
-                        l'irradiance varie selon la taille de cellule.
+  1. TAILLE    : sur 3 sites (montagne, littoral, plaine), de combien
+                 l'irradiance varie selon la taille de cellule.
   2. TEMPS            : combien de temps pour couvrir une region selon la taille.
   3. MOYENNAGE        : sur 2 scenarios (fort / faible ombrage), ecart d'irradiance
                         entre "transposer puis moyenner (mois, heure)" et "heure par
@@ -38,7 +38,7 @@ from src.irradiance.meteo.grille_fct import telecharger, transpAgr
 SORTIE = "statistiques/meteo"        # dossier des CSV + PNG
 CACHE  = "data/tables/test"          # telechargements PVGIS mis en cache (pickle)
 
-# --- partie 1 : taille -> erreur ---  (centre de chaque fenetre de test)
+# --- partie 1 : erreur selon la taille ---  (centre de chaque fenetre de test)
 SITES = {
     "montagne": (45.20,  5.85),      # Alpes (Grenoble)
     "littoral": (48.20, -4.30),      # Bretagne (Finistere)
@@ -65,7 +65,7 @@ SCENARIOS_MOY = [
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
-def charger_brut(lat, lon):
+def chargerBrut(lat, lon):
     """Series horaires PVGIS pour un point, avec cache disque (evite de re-telecharger)."""
     os.makedirs(CACHE, exist_ok=True)
     chemin = os.path.join(CACHE, f"brut_{lat:.2f}_{lon:.2f}.pkl")
@@ -76,9 +76,9 @@ def charger_brut(lat, lon):
     return df
 
 
-def ghi_annuel(lat, lon):
+def ghiAnnuel(lat, lon):
     """Irradiation horizontale annuelle moyenne d'un point (kWh/m2/an)."""
-    df = charger_brut(lat, lon)
+    df = chargerBrut(lat, lon)
     ghi = (df["poa_direct"] + df["poa_sky_diffuse"]).clip(lower=0)
     return ghi.sum() / df.index.year.nunique() / 1000.0
 
@@ -93,11 +93,11 @@ def enregistrer(nom_csv, df, nom_png):
 
 
 # ----------------------------------------------------------------------------
-# Partie 1 : taille -> erreur
+# Partie 1 : erreur selon la taille
 # ----------------------------------------------------------------------------
-def erreur_site(lat0, lon0):
-    """Pour un site : ecart moyen d'irradiance (%) entre points distants d'AU PLUS
-    chaque taille de cellule (cumulatif -> bien echantillonne et monotone).
+def erreurSite(lat0, lon0):
+    """Pour un site : ecart moyen d'irradiance (%) entre points distants d'au plus
+    chaque taille de cellule (cumulatif : bien echantillonne et monotone).
     @return (tailles_deg, ecarts_pct)."""
     moitie = (N_COTE - 1) / 2
     pts, E = [], []
@@ -106,7 +106,7 @@ def erreur_site(lat0, lon0):
             la = round(lat0 + (i - moitie) * PAS_FIN, 3)
             lo = round(lon0 + (j - moitie) * PAS_FIN, 3)
             pts.append((la, lo))
-            E.append(ghi_annuel(la, lo))
+            E.append(ghiAnnuel(la, lo))
     pts, E = np.array(pts), np.array(E)
     moy = E.mean()
 
@@ -121,12 +121,12 @@ def erreur_site(lat0, lon0):
     return np.round(tailles, 2), np.round(pct, 2)
 
 
-def effet_taille():
+def effetTaille():
     """Compare l'erreur due a la taille de cellule sur les 3 sites."""
-    print("=== Taille de cellule -> erreur ===")
+    print("=== Erreur selon la taille de cellule ===")
     res = pd.DataFrame()
     for nom, (lat, lon) in SITES.items():
-        tailles, pct = erreur_site(lat, lon)
+        tailles, pct = erreurSite(lat, lon)
         res["taille_deg"] = tailles
         res[nom] = pct
         print(f"  {nom:9s} : " + "  ".join(f"{t:.2f}={p:.1f}%" for t, p in zip(tailles, pct)))
@@ -149,9 +149,9 @@ def effet_taille():
 # ----------------------------------------------------------------------------
 # Partie 2 : temps de calcul  (sous-partie : taille)
 # ----------------------------------------------------------------------------
-def effet_temps():
+def effetTemps():
     """Mesure le cout d'1 cellule (telechargement + transposition) et extrapole a une region."""
-    print("=== Temps de calcul -> selon la taille ===")
+    print("=== Temps de calcul selon la taille ===")
     t0 = time.time(); df = telecharger(LAT_TEMPS, LON_TEMPS);  t_dl = time.time() - t0
     t0 = time.time(); transpAgr(df["poa_direct"], df["poa_sky_diffuse"], LAT_TEMPS, LON_TEMPS)
     t_calc = time.time() - t0
@@ -184,7 +184,7 @@ def effet_temps():
 # ----------------------------------------------------------------------------
 # Section : moyennage  (transposer puis moyenner vs heure par heure)
 # ----------------------------------------------------------------------------
-def _temps_par_pixel(fn):
+def _tempsParPixel(fn):
     """Temps moyen d'un appel a fn (s), mesure en boucle jusqu'a >= 0.2 s
     (robuste : evite les 0.000 s sur les operations tres rapides)."""
     n, t0 = 0, time.time()
@@ -193,14 +193,14 @@ def _temps_par_pixel(fn):
     return (time.time() - t0) / n
 
 
-def effet_moyennage():
+def effetMoyennage():
     """Sur 2 scenarios (fort / faible ombrage), compare :
        - HORAIRE : annee TYPIQUE horaire (~8760 pas, moyenne par mois/jour/heure),
                    ombrage applique a chaque heure ;
        - MOYENNE (notre methode) : profil (mois, heure) (288 pas), ombrage sur la moyenne.
     Sort le graphe d'ecart + le temps de calcul aval par pixel (console / CSV)."""
     print("=== Moyennage : ecart et temps (moyenne vs horaire) ===")
-    df = charger_brut(LAT_MOY, LON_MOY)
+    df = chargerBrut(LAT_MOY, LON_MOY)
     t   = df.index
     dhi = df["poa_sky_diffuse"]
     ghi = (df["poa_direct"] + dhi).clip(lower=0)
@@ -241,8 +241,8 @@ def effet_moyennage():
         E_h, E_m = horaire(), moyenne()
         ecart = 100 * (E_m - E_h) / E_h
         # temps de calcul aval, par pixel (table moyenne supposee deja construite)
-        t_h = _temps_par_pixel(horaire) * 1e6        # micro-secondes / pixel
-        t_m = _temps_par_pixel(moyenne) * 1e6
+        t_h = _tempsParPixel(horaire) * 1e6          # micro-secondes / pixel
+        t_m = _tempsParPixel(moyenne) * 1e6
         print(f"  {nom:14s} horaire={E_h:6.1f}  moyenne={E_m:6.1f} kWh/m2/an  ({ecart:+.2f}%)"
               f"  | par pixel : horaire {t_h:.0f} us, moyenne {t_m:.1f} us (x{t_h/t_m:.0f})")
         lignes.append((nom, round(E_h, 1), round(E_m, 1), round(ecart, 2),
@@ -273,7 +273,7 @@ def effet_moyennage():
 
 
 # ----------------------------------------------------------------------------
-TESTS = {"taille": effet_taille, "temps": effet_temps, "moyennage": effet_moyennage}
+TESTS = {"taille": effetTaille, "temps": effetTemps, "moyennage": effetMoyennage}
 
 if __name__ == "__main__":
     for nom in (sys.argv[1:] or TESTS):

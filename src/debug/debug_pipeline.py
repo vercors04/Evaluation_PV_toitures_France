@@ -23,7 +23,7 @@ def exportHorizon(horizon, masque_toiture, meta, out_dir, nodata=-9999.0):
     Eclate la table horizon (N, n_dir) en un GeoTIFF par direction.
     --------
     @param[in] horizon        : (N, n_dir) angle d'horizon par pixel (sortie compHZ)
-    @param[in] masque_toiture : 2D bool — pixels de toit (MEME ordre que horizon)
+    @param[in] masque_toiture : 2D bool, pixels de toit (meme ordre que horizon)
     @param[in] meta           : profil rasterio de la dalle
     @param[in] out_dir        : dossier de sortie
     """

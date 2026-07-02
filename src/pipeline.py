@@ -14,7 +14,7 @@ from src.irradiance.meteo.grille_fct import chargerTable
 from src.irradiance.irr_calcul import irrPixels
 from src.agregation.agregation import agregerBatiment, mergeCleabs
 from src.agregation.select import filtrer, hBat
-from src.acquisition.telechargement import telecharger_fichier, liste_telechargement
+from src.acquisition.telechargement import telechargerFichier, listeTelechargement
 from src.acquisition.batiments import batiments
 from src.acquisition.zone import zone
 from src.acquisition.dalles import dalles
@@ -114,7 +114,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
 
 
     taches = []
-    for nom_mnt, url_mnt, nom_mns, url_mns in liste_telechargement(dalles(polygone)):
+    for nom_mnt, url_mnt, nom_mns, url_mns in listeTelechargement(dalles(polygone)):
         xmin, ymin, xmax, ymax = tileBounds(nom_mns)
         gdf_dalle = gdf_bati.cx[xmin:xmax, ymin:ymax]
         if not gdf_dalle.empty:
@@ -210,8 +210,8 @@ def trait1Dalle(tache):
     try:
         t0 = time.perf_counter()
         with ThreadPoolExecutor(2) as dl:
-            f_mnt = dl.submit(telecharger_fichier, url_mnt, nom_mnt, config.OUT_DIR_RAW)
-            f_mns = dl.submit(telecharger_fichier, url_mns, nom_mns, config.OUT_DIR_RAW)
+            f_mnt = dl.submit(telechargerFichier, url_mnt, nom_mnt, config.OUT_DIR_RAW)
+            f_mns = dl.submit(telechargerFichier, url_mns, nom_mns, config.OUT_DIR_RAW)
             mnt_path, mns_path = f_mnt.result(), f_mns.result()
         temps["telechargement"] = time.perf_counter() - t0
         return traiterDalle(mns_path, mnt_path, gdf_dalle, temps=temps), temps

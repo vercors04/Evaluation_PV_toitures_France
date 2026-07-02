@@ -16,7 +16,7 @@ def agregerBatiment(df, gdf, hauteur):
 
     @return out : GeoDataFrame, 1 ligne par batiment ayant >= 1 pixel de toit
     """
-    pv = config.TAUX_COUVERTURE * config.RENDEMENT_MODULE * config.PERFORMANCE_RATIO  # kWh recus -> produits
+    pv = config.TAUX_COUVERTURE * config.RENDEMENT_MODULE * config.PERFORMANCE_RATIO  # conversion des kWh recus en kWh produits
 
     inc     = df[df.incline]                       # incline, toutes orientations
     inc_or  = df[df.incline_or]                    # incline oriente sud
@@ -40,7 +40,7 @@ def agregerBatiment(df, gdf, hauteur):
 
     res["hauteur_pts"] = hauteur   # hauteur issue du MNH, pas de la BD TOPO
 
-    res = res.fillna(0.0)                           # mettre des 0 au lieu de NaN
+    res = res.fillna(0.0)                           # batiment sans pixel d'une categorie : 0 plutot que NaN
 
     res["surf_tot_m2"]      = res.surf_incl_m2 + res.surf_plate_m2
     res["puissance_kwc_orp"] = (res.surf_incl_or_m2 + res.surf_plate_m2) * config.TAUX_COUVERTURE * config.RENDEMENT_MODULE
@@ -68,12 +68,12 @@ def mergeCleabs(gdf):
     @return GeoDataFrame : 1 ligne par cleabs (morceaux recolles)
     """
     gdf = gdf.copy()
-    gdf["_pente_pond"] = gdf.pente_moy_incl * gdf.nb_pixels       # pour la moyenne ponderee
+    gdf["_pente_pond"] = gdf.pente_moy_incl * gdf.surf_incl_m2    # pour la moyenne ponderee (par surface inclinee)
     agg = {c: "sum" for c in gdf.columns                          # surfaces, energies, prod, puissance, nb_pixels
            if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c in ("nb_pixels", "_pente_pond")}
     agg.update({a: "first" for a in config.ATTRS_BATI})   # attributs BD TOPO recopies
     agg.update(hauteur_pts="max", geometry="first")
     out = gdf.groupby("cleabs", as_index=False).agg(agg)
-    out["pente_moy_incl"] = out._pente_pond / out.nb_pixels       # pente moyenne ponderee par pixels
+    out["pente_moy_incl"] = (out._pente_pond / out.surf_incl_m2).fillna(0.0)  # pente moyenne ponderee par surface
     out = out.drop(columns="_pente_pond")
     return gpd.GeoDataFrame(out, geometry="geometry", crs=gdf.crs)

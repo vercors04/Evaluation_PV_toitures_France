@@ -66,6 +66,7 @@ USAGE_1  = ['Agricole', 'Annexe', 'Commercial et services', 'Indifférencié',
             'Industriel', 'Religieux', 'Résidentiel', 'Sportif']
 ECHELLES = ['Adresse', 'Commune ou ville', 'Département', 'Région', 'France']
 
+ETATS = ['En service', 'En construction', 'En ruines', 'Detruit']
 
 # ============================================================
 #  Reglages modifiables 
@@ -99,7 +100,7 @@ def derive():
     global FILTRES_BATI
     FILTRES_BATI = {                               
         "etat_de_l_objet":     ETAT,
-        "construction_legere": CONSTRUCTION_LEGERE,
+        "construction_legere": [True, False] if CONSTRUCTION_LEGERE else False,
         "nature":              NATURE_OK,
         "usage_1":             USAGE_OK,
     }

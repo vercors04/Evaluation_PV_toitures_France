@@ -113,11 +113,11 @@ def chargerTable(lat, lon):
         chemin = cheminTable(la, lo)
         if not os.path.exists(chemin):
             raise FileNotFoundError(
-                f"Table meteo absente pour la cellule ({la}, {lo}) -> {chemin}. "
-                f"Construis-la d'abord avec main_meteo.")
+                f"Table meteo absente pour la cellule ({la}, {lo}) : {chemin}. "
+                f"A construire au prealable avec main_meteo.")
         d = np.load(chemin)
 
         _cache[(la, lo)] = (d["B"].astype(np.float32), d["D"].astype(np.float32),
-                            d["SAZ"], d["SEL"])      # disque en float16 -> calcul en float32
+                            d["SAZ"], d["SEL"])      # stocke en float16, calcule en float32
 
     return _cache[(la, lo)]

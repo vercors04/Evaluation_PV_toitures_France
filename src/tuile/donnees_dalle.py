@@ -1,6 +1,6 @@
 from pyproj import Transformer
 
-_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 -> WGS84 
+_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 vers WGS84
 
 
 def nomCoord(mns_name):
@@ -32,7 +32,7 @@ def tileBounds(mns_name):
     """
     Emprise de la tuile depuis le nom du fichier MNS IGN.
     --------
-    @param[in] mns_name : nom du fichier MNS IGN (0495_6611 -> x=495000, y=6611000, coin NO)
+    @param[in] mns_name : nom du fichier MNS IGN (0495_6611 : x=495000, y=6611000, coin NO)
 
     @return (x_min, y_min, x_max, y_max) : emprise en Lambert 93 (tuile 1 km x 1 km)
     """

@@ -3,7 +3,7 @@ import os, time, requests
 from src import config
 
 
-def telecharger_fichier(url, nom_fichier, dossier_dest):
+def telechargerFichier(url, nom_fichier, dossier_dest):
     """
     Telecharge un fichier en streaming, avec retry + backoff (config.N_ESSAIS, config.PAUSE_DL).
     --------
@@ -24,8 +24,7 @@ def telecharger_fichier(url, nom_fichier, dossier_dest):
             with open(chemin, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
-            return chemin  #si tout ok un seul essai
-        
+            return chemin
 
         except requests.RequestException:
             if essai < n_essais:
@@ -35,8 +34,7 @@ def telecharger_fichier(url, nom_fichier, dossier_dest):
 
 
 
-def liste_telechargement(dictionnaire_resultats):
-
+def listeTelechargement(dictionnaire_resultats):
     """
     Apparie les dalles MNT et MNS (par identifiant) en paires a telecharger.
     --------
