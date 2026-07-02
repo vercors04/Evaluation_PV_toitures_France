@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('data/tables', 'data/tables'), ('variables.md', '.'), ('executable/logo.ico', 'executable')]
+datas = [('data/tables', 'data/tables'), ('a_propos.md', '.'), ('executable/logo.ico', 'executable')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pyproj')
