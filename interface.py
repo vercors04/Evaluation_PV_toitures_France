@@ -6,7 +6,7 @@ from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuC
                                        barreProgression, zoneLogs)
 from src import config
 from src.pipeline import runPipeline
-from executable.tool_fct_exe import afficherBilan
+from executable.tool_fct_exe import afficherBilan, listesFichiers, selecFichier
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     os.makedirs(config.OUT_DIR_RAW, exist_ok=True)
 
     fen1=fenetre("roofTool", 1000, 500)
-    fen1.iconbitmap(os.path.join(config.BASE_DATA, "executable", "logo.ico"))
+    fen1.iconbitmap(os.path.join(config.BASE_DATA, "data/assets", "logo_soleil.ico"))
 
     q = queue.Queue()
 
@@ -327,6 +327,8 @@ if __name__ == "__main__":
                     barre["value"] = 0
                     for ligne in afficherBilan(item[1]):
                         ecrireLog(ligne + "\n")
+                    #rafraichirPP()
+                    #rafraichirSR()
 
                 elif item[0] == "error":
                     btn_lancer.configure(state="normal")
@@ -351,26 +353,30 @@ if __name__ == "__main__":
     bpp.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
 
-    n_essais_wfs   = champ2(bpp, "nombres d'essais wfs", config.N_ESSAIS_WFS)
-    pause_wfs   = champ2(bpp, "Pause entre les essais (s)", config.PAUSE_WFS)
-    n_coeurs    = champ2(bpp, "Nombre de coeurs (parallelisme)", config.N_COEURS)
-    n_threads   = champ2(bpp, "Nombre de threads (requetes WFS)", config.N_THREADS)
-    count       = champ2(bpp, "Taille des paquets WFS (count)", config.COUNT)
-    n_essais    = champ2(bpp, "Nombre d'essais telechargement dalles", config.N_ESSAIS)
-    pause_dl    = champ2(bpp, "Pause entre essais telechargement (s)", config.PAUSE_DL)
+    n_essais_wfs   = champ2(bpp, "nombres d'essais wfs", config.N_ESSAIS_WFS, aide = "nombres d'essais pour la requête WFS si elle échoue")
+    pause_wfs   = champ2(bpp, "Pause entre les essais (s)", config.PAUSE_WFS, aide = "pause entre les essais pour la requête WFS")
+    n_coeurs    = champ2(bpp, "Nombre de coeurs (parallelisme)", config.N_COEURS, aide = "nombre de coeurs à utiliser pour le parallélisme")
+    n_threads   = champ2(bpp, "Nombre de threads (requetes WFS)", config.N_THREADS, aide = "nombre de threads pour les requêtes WFS")
+    count       = champ2(bpp, "Taille des paquets WFS (count)", config.COUNT, aide = "nombre de batiment récupéré par requête WFS")
+    n_essais    = champ2(bpp, "Nombre d'essais telechargement dalles", config.N_ESSAIS, aide = "nombre d'essais pour le téléchargement des dalles si elles échouent")
+    pause_dl    = champ2(bpp, "Pause entre essais telechargement (s)", config.PAUSE_DL, aide = "pause entre les essais pour le téléchargement des dalles")
 
-    buffer      = champ2(bpp, "Tampon autour des batiments (m)", config.BUFFER)
-    mnh_min     = champ2(bpp, "Hauteur min au-dessus du sol (m)", config.MNH_MIN)
+    buffer      = champ2(bpp, "Tampon autour des batiments (m)", config.BUFFER, aide = "marge autour des emprises BD TOPO pour capturer tout les pixels de toit")
+    mnh_min     = champ2(bpp, "Hauteur min au-dessus du sol (m)", config.MNH_MIN, aide = "hauteur minimale au dessus du sol pour qu'un pixel soit considéré comme faisant partit du toit")
 
-    n_directions = listeDeroulante(bpp, "Nombre de directions azimutales", config.DIVISEURS_360, config.N_DIRECTIONS,)
-    dist_max_m   = champ2(bpp, "Rayon de recherche d'ombrage (m)", config.DIST_MAX_M)
-    cap          = champ2(bpp, "Plafond solaire (deg)", config.CAP)
+    n_directions = listeDeroulante(bpp, "Nombre de directions azimutales", config.DIVISEURS_360, config.N_DIRECTIONS, aide = "nombre de directions azimutales pour le calcul de l'ombrage")
+    dist_max_m   = champ2(bpp, "Rayon de recherche d'ombrage (m)", config.DIST_MAX_M, aide = "distance maximale pour le calcul de l'ombrage. Les batiments plus loin ne sont pas considérés comme ombrageant le toit.")
+    cap          = champ2(bpp, "Plafond solaire (deg)", config.CAP, aide = "angle a partir duquel un obstacle est ignoré car trop haut pour bloquer le soleil")
 
     rendement_module   = champ2(bpp, "Rendement du module PV", config.RENDEMENT_MODULE)
     performance_ratio  = champ2(bpp, "Performance ratio (pertes systeme)", config.PERFORMANCE_RATIO)
     taux_couverture    = champ2(bpp, "Taux de couverture du toit", config.TAUX_COUVERTURE)
     albedo = champ2(bpp, "Albédo (réflectivité du sol)", config.ALBEDO)
 
+    # bfg = boite(o2, "fichiers générés")  # boite fichiers generes
+    # bfg.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+    # rafraichirPP = listesFichiers(bfg, config.DIR_GEOJSON, config.OUT_DIR_PROCESSED)
 
     #======onglet 3======
     o3 = onglet(nb, "Visualisation sur carte")
@@ -378,6 +384,17 @@ if __name__ == "__main__":
     
     #======onglet 4======
     o4 = onglet(nb, "Statistiques rapides")
+    o4.columnconfigure(0, weight=1, uniform="col")
+    o4.columnconfigure(1, weight=1, uniform="col")
+    o4.columnconfigure(2, weight=1, uniform="col")
+    o4.rowconfigure(0, weight=1, uniform="row")
+    o4.rowconfigure(1, weight=1, uniform="row")
+    bad = boite(o4, "gpkg calculés") #boite affichage dossier
+    bad.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
+
+    bs = boite(o4, "statistiques") #boite affichage statistiques
+    bs.grid(row=0, column=1, rowspan=2, columnspan=2, sticky="nsew", padx=10, pady=10)
+    rafraichirSR = selecFichier (bad, config.OUT_DIR_PROCESSED)
 
 
 

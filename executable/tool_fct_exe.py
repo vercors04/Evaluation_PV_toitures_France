@@ -1,3 +1,7 @@
+from tkinter import ttk, messagebox
+import tkinter as tk
+import os
+
 def formaterDuree(secondes):
     """
     Formate une duree en secondes vers 'XhYYminZZs' (heures/minutes omises si nulles).
@@ -55,3 +59,82 @@ def afficherBilan(bilan):
             lignes.append(f"   - {e['nom']} : {e['erreur']}")
 
     return lignes
+
+
+
+
+def listesFichiers(parent, geojson_dir, gpkg_dir):
+    """
+    Affiche cote a cote la liste des fichiers de deux dossiers (geojson / gpkg),
+    avec un bouton pour ouvrir leur dossier parent dans l'explorateur.
+    --------
+    @param[in] parent      : la boite ou ranger les listes
+    @param[in] geojson_dir : dossier des .geojson
+    @param[in] gpkg_dir    : dossier des .gpkg
+
+    @return fonction rafraichir : rescanne les deux dossiers et met a jour l'affichage
+    """
+    colonnes = ttk.Frame(parent); colonnes.pack(fill="both", expand=True)
+    colonnes.columnconfigure(0, weight=1)
+    colonnes.columnconfigure(1, weight=1)
+    colonnes.rowconfigure(1, weight=1)
+
+    ttk.Label(colonnes, text="geojson").grid(row=0, column=0)
+    liste_geojson = tk.Listbox(colonnes, selectmode="extended")
+    liste_geojson.grid(row=1, column=0, sticky="nsew", padx=2)
+
+    ttk.Label(colonnes, text="gpkg").grid(row=0, column=1)
+    liste_gpkg = tk.Listbox(colonnes, selectmode="extended")
+    liste_gpkg.grid(row=1, column=1, sticky="nsew", padx=2)
+
+    def rafraichir():
+        liste_geojson.delete(0, "end")
+        liste_gpkg.delete(0, "end")
+        if os.path.isdir(geojson_dir):
+            for nom in sorted(os.listdir(geojson_dir)):
+                liste_geojson.insert("end", nom)
+        if os.path.isdir(gpkg_dir):
+            for nom in sorted(os.listdir(gpkg_dir)):
+                liste_gpkg.insert("end", nom)
+
+    def supprimer(listbox, dossier):
+        selection = listbox.curselection()
+        if not selection:
+            return
+        noms = [listbox.get(i) for i in selection]
+        if not messagebox.askyesno("Confirmer", f"Supprimer {len(noms)} fichier(s) ?\n" + "\n".join(noms)):
+            return
+        for nom in noms:
+            os.remove(os.path.join(dossier, nom))
+        rafraichir()
+    
+    ttk.Button(colonnes, text="Supprimer",
+               command=lambda: supprimer(liste_geojson, geojson_dir)).grid(row=2, column=0, pady=2)
+    ttk.Button(colonnes, text="Supprimer",
+               command=lambda: supprimer(liste_gpkg, gpkg_dir)).grid(row=2, column=1, pady=2)
+
+    ttk.Button(parent, text="Ouvrir dans l'explorateur",
+               command=lambda: os.startfile(os.path.dirname(geojson_dir))).pack(pady=4)
+
+    rafraichir()
+    return rafraichir
+
+
+def selecFichier(parent, gpkg_dir):
+    parent.columnconfigure(1, weight=1)
+    parent.rowconfigure(1, weight=1)
+
+    liste_gpkg = tk.Listbox(parent,  selectmode="extended")
+    liste_gpkg.grid(row=1, column=1, sticky="nsew", padx=2)
+
+    def rafraichir():
+        liste_gpkg.delete(0, "end")
+        if os.path.isdir(gpkg_dir):
+            for nom in sorted(os.listdir(gpkg_dir)):
+                liste_gpkg.insert("end", nom)
+
+    ttk.Button(parent, text="rafraichir",
+               command=lambda: rafraichir()).grid(row=2, column=1, pady=2)
+
+    rafraichir()
+    return rafraichir
