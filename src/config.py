@@ -93,5 +93,5 @@ GROUPES_SORTIE = {
     "puissance_kwc_orp": ["puissance_kwc_orp"],
     "prod_an_kwh_orp":  ["prod_an_kwh_orp"],
     "production_trim": [f"prod_T{t}_kwh_orp" for t in range(1, 5)],
-},
+}
 SORTIE_GARDEES = list(GROUPES_SORTIE)
