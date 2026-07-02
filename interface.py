@@ -1,8 +1,9 @@
+import os
 import queue, threading, requests, multiprocessing
 from tkinter import ttk
-from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menu_coches,
+from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuCoches,
                                        onglets, radioBoutons, onglet,
-                                       barre_progression, zone_logs)
+                                       barreProgression, zoneLogs)
 from src import config
 from src.pipeline import runPipeline
 from executable.tool_fct_exe import afficherBilan
@@ -11,6 +12,8 @@ from executable.tool_fct_exe import afficherBilan
 if __name__ == "__main__":
     multiprocessing.freeze_support()   
     fen1=fenetre("roofTool", 1000, 500)
+    fen1.iconbitmap(os.path.join(config.BASE_DATA, "executable", "logo.ico"))
+
     q = queue.Queue()
 
     #======onglet 1======
@@ -36,17 +39,17 @@ if __name__ == "__main__":
 
     const_leg   = case(bpg, "Inclure constructions legeres", False)
 
-    attrs       = menu_coches(bpg, "Attributs BD TOPO",
+    attrs       = menuCoches(bpg, "Attributs BD TOPO",
                                 config.ATTRS_BDTOPO,
                                 ["nature", "usage_1", "nombre_d_etages"])
 
-    etat = menu_coches (bpg, "Etat", ["En service", "En construction", "En ruines", "Detruit"], "En service")
-    nature = menu_coches(bpg, "Natures gardees", config.NATURES,
+    etat = menuCoches (bpg, "Etat", ["En service", "En construction", "En ruines", "Detruit"], "En service")
+    nature = menuCoches(bpg, "Natures gardees", config.NATURES,
                                 ['Indifférenciée', 'Industriel, agricole ou commercial'])
-    usage_1 = menu_coches(bpg, "Usages gardees", config.USAGE_1,
+    usage_1 = menuCoches(bpg, "Usages gardees", config.USAGE_1,
                                 ['Résidentiel', 'Commercial et services', 'Indifférencié', 'Industriel', 'Agricole'])
 
-    sortie = menu_coches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), list(config.GROUPES_SORTIE))
+    sortie = menuCoches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), list(config.GROUPES_SORTIE))
 
 
     #-------------choix zone-------------
@@ -249,10 +252,10 @@ if __name__ == "__main__":
     btn_lancer = ttk.Button(bl, text="Lancer", command=lambda: lancer())
     btn_lancer.pack(anchor="w", pady=5)
 
-    barre = barre_progression(bl)
+    barre = barreProgression(bl)
     barre.pack(fill="x", pady=5)
 
-    logs = zone_logs(bl, hauteur=8)
+    logs = zoneLogs(bl, hauteur=8)
     logs.pack(fill="both", expand=True, pady=5)
     logs.configure(state="disabled")
 
@@ -367,20 +370,35 @@ if __name__ == "__main__":
     o3 = onglet(nb, "Visualisation sur carte")
  
     
-    #======onglet 5======
-    o5 = onglet(nb, "Statistiques rapides")
-
-
-
     #======onglet 4======
-    o4 = onglet(nb, "À propos")
-    bne = boite(o4, "à propos")
-    bne.grid(row=0, column=1, sticky="ne", padx=10, pady=10)
+    o4 = onglet(nb, "Statistiques rapides")
+
+
+
+    #======onglet 5======
+    o5 = onglet(nb, "À propos")
+    o5.columnconfigure(0, weight=1)
+    o5.rowconfigure(0, weight=1)
+
+    bap = boite(o5, "à propos")  # boite a propos
+    bap.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+    apropos = zoneLogs(bap, hauteur=25)
+    apropos.pack(fill="both", expand=True)
+    apropos.configure(font=("Consolas", 10))
+
+    with open(os.path.join(config.BASE_DATA, "a_propos.md"), encoding="utf-8") as f:
+        apropos.insert("1.0", f.read())
+    apropos.configure(state="disabled")
 
 
     
    
-
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except ImportError:
+        pass
 
     fen1.mainloop()                  
 

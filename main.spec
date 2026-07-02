@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('data/tables', 'data/tables')]
+datas = [('data/tables', 'data/tables'), ('variables.md', '.'), ('executable/logo.ico', 'executable')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pyproj')
@@ -25,7 +25,7 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['main.py'],
+    ['interface.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -52,12 +52,13 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='executable/logo.ico',
 )
 coll = COLLECT(
     exe,

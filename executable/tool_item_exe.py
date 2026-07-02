@@ -66,7 +66,7 @@ def radioBoutons(parent, libelle, options, defaut, on_change=None):
     return var
 
 
-def barre_progression(parent):
+def barreProgression(parent):
     """
     Cree une barre de progression (0 a 100).
     --------
@@ -77,7 +77,7 @@ def barre_progression(parent):
     return ttk.Progressbar(parent, maximum=100)
 
 
-def zone_logs(parent, hauteur=10):
+def zoneLogs(parent, hauteur=10):
     """
     Cree une zone de texte deroulante pour afficher des messages.
     --------
@@ -139,7 +139,7 @@ def case(parent, libelle, defaut):
 
 
 
-def menu_coches(parent, libelle, options, defaut):
+def menuCoches(parent, libelle, options, defaut):
     """
     Un bouton qui ouvre un panneau de cases a cocher (compact, une seule fenetre a la fois).
     Au-dela de 5 options, elles sont reparties en colonnes cote a cote.
