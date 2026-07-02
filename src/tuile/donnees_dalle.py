@@ -1,6 +1,6 @@
 from pyproj import Transformer
 
-_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 -> WGS84 (reutilisable)
+_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 -> WGS84 
 
 
 def nomCoord(mns_name):

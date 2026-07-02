@@ -94,7 +94,7 @@ DEFAULTS = {
 }
 
 
-def _derive():
+def derive():
     """Recalcule les reglages derives des valeurs courantes. Appelee apres chaque chargement."""
     global FILTRES_BATI
     FILTRES_BATI = {                               
@@ -112,7 +112,7 @@ def load():
         with open(SETTINGS, encoding="utf-8") as f:
             valeurs.update(json.load(f))
     globals().update(valeurs)
-    _derive()
+    derive()
 
 
 def save(reglages):
