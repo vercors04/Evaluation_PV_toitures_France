@@ -97,7 +97,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     """
     t_total = time.time()
     t0 = time.time()
-    polygone = zone(echelle, nom_zone.replace("'", "''"), code_dep)
+    polygone = zone(echelle, nom_zone, code_dep)
     if polygone is None:
         on_log("zone introuvable"); return None
 
@@ -130,7 +130,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=config.N_COEURS,
                              initializer=numba.set_num_threads, initargs=(1,)) as ex:
-        for i, (out, temps) in enumerate(ex.map(trait1Dalle, taches), 1):
+        for i, (out, temps) in enumerate(ex.map(traiterTache, taches), 1):
             if out is None:
                 echecs.append({"nom": temps.get("nom", "?"), "erreur": temps.get("erreur", "")})      
                 on_log(f"echec dalle {temps.get('nom','?')}") 
@@ -194,7 +194,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
 
 
 
-def trait1Dalle(tache):
+def traiterTache(tache):
     """
     Traite une dalle dans un worker : telecharge MNS/MNT, calcule, nettoie les fichiers.
     Definie au niveau module pour rester picklable par ProcessPoolExecutor.

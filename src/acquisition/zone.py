@@ -34,6 +34,7 @@ def zone(echelle, nom_zone, code_dep=None):
         return box(lon-0.002, lat-0.002, lon+0.002, lat+0.002)   # ~1 dalle autour du point
 
 
+    nom_zone = nom_zone.replace("'", "''")
     cql = {
         "commune":     f"nom_officiel ILIKE '{nom_zone}' AND code_insee_du_departement = '{code_dep}'",
         "departement": f"nom_officiel ILIKE '{nom_zone}' OR code_insee = '{nom_zone}'",

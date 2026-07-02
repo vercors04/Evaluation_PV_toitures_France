@@ -46,7 +46,7 @@ def main():
     else:
         print("Choisissez entre 0 et 4."); return
 
-    polygone = zone(echelle, nom_zone.replace("'", "''"), code_dep)
+    polygone = zone(echelle, nom_zone, code_dep)
     if polygone is None:
         print("zone introuvable"); return
 

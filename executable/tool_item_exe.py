@@ -1,17 +1,21 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import math
+from tkinter import ttk, scrolledtext, messagebox
 
 
 def onglets(parent):
-    """Cree un bloc a onglets (Notebook), a placer avec .pack/.grid."""
     return ttk.Notebook(parent)
 
 def onglet(notebook, titre):
-    """Cree un onglet (Frame) et l'ajoute au notebook."""
     f = ttk.Frame(notebook)
     notebook.add(f, text=titre)
     return f
+
+def bulleAide(parent, message):
+    q = ttk.Label(parent, text="?", foreground="blue", cursor="hand2")
+    q.pack(side="left", padx=(4, 0))
+    q.bind("<Button-1>", lambda e: messagebox.showinfo("Aide", message))
 
 
 def fenetre(titre="", largeur=600, hauteur=400):
@@ -91,7 +95,7 @@ def zoneLogs(parent, hauteur=10):
 
 
 
-def champ(parent, libelle, defaut):
+def champ(parent, libelle, defaut, aide = None):
     """
     Une ligne 'libelle : [case texte]', rangee automatiquement dans parent.
     --------
@@ -104,10 +108,12 @@ def champ(parent, libelle, defaut):
     ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     ttk.Label(ligne, text=libelle, width=18).pack(side="left")
     e = ttk.Entry(ligne); e.insert(0, str(defaut)); e.pack(side="left", fill="x", expand=True)
+    if aide:
+        bulleAide(ligne, aide)
     return e
 
 
-def champ2(parent, libelle, defaut):
+def champ2(parent, libelle, defaut, aide = None):
     """
     Une ligne 'libelle : [case texte]', rangee automatiquement dans parent.
     --------
@@ -120,9 +126,32 @@ def champ2(parent, libelle, defaut):
     ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     ttk.Label(ligne, text=libelle, width=35).pack(side="left")
     e = ttk.Entry(ligne); e.insert(0, str(defaut)); e.pack(side="left", fill="x", expand=True)
+    if aide:
+        bulleAide(ligne, aide)
     return e
 
-def case(parent, libelle, defaut):
+def listeDeroulante(parent, libelle, options, defaut, aide = None):
+    """
+    Une ligne 'libelle : [liste deroulante]', a choix unique parmi options (lecture seule).
+    --------
+    @param[in] parent  : la boite ou ranger ce champ
+    @param[in] libelle : texte a gauche
+    @param[in] options : liste des choix possibles
+    @param[in] defaut  : valeur selectionnee au depart
+
+    @return Combobox : lire avec .get() (renvoie du texte, a convertir en int/float)
+    """
+    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
+    ttk.Label(ligne, text=libelle, width=35).pack(side="left")
+    cb = ttk.Combobox(ligne, values=options, state="readonly")
+    cb.set(defaut)
+    cb.pack(side="left", fill="x", expand=True)
+    if aide:
+        bulleAide(ligne, aide)
+    return cb
+
+
+def case(parent, libelle, defaut, aide = None):
     """
     Une case a cocher (oui/non), rangee automatiquement dans parent.
     --------
@@ -132,14 +161,17 @@ def case(parent, libelle, defaut):
 
     @return BooleanVar : lire avec .get() (True/False)
     """
+    ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     var = tk.BooleanVar(value=defaut)
-    ttk.Checkbutton(parent, text=libelle, variable=var).pack(anchor="w", pady=2)
+    ttk.Checkbutton(ligne, text=libelle, variable=var).pack(anchor="w", pady=2)
+    if aide:
+        bulleAide(ligne, aide)
     return var
 
 
 
 
-def menuCoches(parent, libelle, options, defaut):
+def menuCoches(parent, libelle, options, defaut, aide = None):
     """
     Un bouton qui ouvre un panneau de cases a cocher (compact, une seule fenetre a la fois).
     Au-dela de 5 options, elles sont reparties en colonnes cote a cote.
@@ -156,6 +188,8 @@ def menuCoches(parent, libelle, options, defaut):
     ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     ttk.Label(ligne, text=libelle, width=18).pack(side="left")
     btn = ttk.Button(ligne); btn.pack(side="left")
+    if aide:
+        bulleAide(ligne, aide)
     etat = {"pop": None}                              
 
     def majTexte():

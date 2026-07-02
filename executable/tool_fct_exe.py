@@ -1,3 +1,20 @@
+def formaterDuree(secondes):
+    """
+    Formate une duree en secondes vers 'XhYYminZZs' (heures/minutes omises si nulles).
+    --------
+    @param[in] secondes : duree en secondes
+
+    @return str : duree formatee, ex. '1h 12min 05s', '3min 42s' ou '8s'
+    """
+    h, reste = divmod(int(secondes), 3600)
+    m, s = divmod(reste, 60)
+    if h:
+        return f"{h}h {m:02d}min {s:02d}s"
+    if m:
+        return f"{m}min {s:02d}s"
+    return f"{s}s"
+
+
 def afficherBilan(bilan):
     """
     Formate le bilan retourne par runPipeline en lignes de texte, pour affichage GUI.
@@ -21,9 +38,9 @@ def afficherBilan(bilan):
 
     glob = bilan.get("temps_globaux", {})
     if glob:
-        lignes.append("Temps globaux (s) :")
+        lignes.append("Temps globaux :")
         for k, v in glob.items():
-            lignes.append(f"   {k:<12}: {v:.1f}")
+            lignes.append(f"   {k:<12}: {formaterDuree(v)}")
 
     bat = bilan.get("batiments", {})
     if bat:

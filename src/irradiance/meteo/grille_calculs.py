@@ -45,24 +45,3 @@ def construireCellule(lat, lon):
                         alphas=config.ALPHAS, betas=config.BETAS, lat=lat, lon=lon,
                         source="PVGIS-SARAH3 2005-2023, Perez")
 
-
-def construire(polygone):
-    """
-    Construit en serie les tables meteo de toutes les cellules de la zone.
-    Saute les cellules deja faites (reprise possible) et liste les echecs a la fin.
-    --------
-    @param[in] polygone : emprise de la zone (shapely, WGS84)
-    """
-    pts = grilleCellules(polygone)
-    print(f"{len(pts)} cellules a construire dans {config.DOSSIER}/ (reprise possible)")
-    ratees = []
-    for k, (lat, lon) in enumerate(pts, 1):
-        if os.path.exists(cheminTable(lat, lon)):
-            continue
-        try:
-            t0 = time.time(); construireCellule(lat, lon)
-            print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  OK  ({time.time()-t0:.0f} s)")
-        except Exception as e:
-            print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  ECHEC : {e}"); ratees.append((lat, lon))
-        time.sleep(config.PAUSE)
-    print(f"Termine. {len(ratees)} echec(s) : {ratees}")

@@ -68,6 +68,8 @@ ECHELLES = ['Adresse', 'Commune ou ville', 'Département', 'Région', 'France']
 
 ETATS = ['En service', 'En construction', 'En ruines', 'Detruit']
 
+DIVISEURS_360 = [6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 72, 90]   
+
 # ============================================================
 #  Reglages modifiables 
 # ============================================================

@@ -2,12 +2,11 @@ import os
 import queue, threading, requests, multiprocessing
 from tkinter import ttk
 from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuCoches,
-                                       onglets, radioBoutons, onglet,
+                                       onglets, radioBoutons, onglet, listeDeroulante,
                                        barreProgression, zoneLogs)
 from src import config
 from src.pipeline import runPipeline
 from executable.tool_fct_exe import afficherBilan
-
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
@@ -35,26 +34,26 @@ if __name__ == "__main__":
     bpg.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
     surf_min   = champ(bpg, "Surface min (m2)", config.SURF_MIN)
-    haut_min   = champ(bpg, "Hauteur min (m)", config.HAUT_MIN)
-    haut_max   = champ(bpg, "Hauteur max (m)", config.HAUT_MAX)
-    az_min     = champ(bpg, "Azimut min", config.AZ_MIN)
-    az_max     = champ(bpg, "Azimut max", config.AZ_MAX)
-    pente_plat = champ(bpg, "Pente plat (deg)", config.PENTE_PLAT)
-    pente_max  = champ(bpg, "Pente max (deg)", config.PENTE_MAX)
+    haut_min   = champ(bpg, "Hauteur min (m)", config.HAUT_MIN, aide = "hauteur minimale du point le plus haut du toit")
+    haut_max   = champ(bpg, "Hauteur max (m)", config.HAUT_MAX, aide="hauteur maximale du point le plus haut du toit")
+    az_min     = champ(bpg, "Azimut min", config.AZ_MIN, aide= "degrés, 0=Nord, 90=Est")
+    az_max     = champ(bpg, "Azimut max", config.AZ_MAX, aide="degrés, 0=Nord, 90=Est")
+    pente_plat = champ(bpg, "Pente plat (deg)", config.PENTE_PLAT, aide="seuil de la pente du toit pour le considérer comme plat")
+    pente_max  = champ(bpg, "Pente max (deg)", config.PENTE_MAX, aide="pente maximale du toit")
 
     const_leg   = case(bpg, "Inclure constructions legeres", False)
 
     attrs       = menuCoches(bpg, "Attributs BD TOPO",
                                 config.ATTRS_BDTOPO,
-                                ["nature", "usage_1", "nombre_d_etages"])
+                                ["nature", "usage_1", "nombre_d_etages"], aide="attributs de la BD TOPO. Les colonnes sont souvent partiellement vide et/ou avec des données éronées. Il est conseillé de ne pas inclure les colonnes 'hauteur' et 'nombre_d_etages' dans le filtrage des toits, mais de les utiliser uniquement pour l'analyse des toits retenus.")
 
     etat = menuCoches(bpg, "Etat", config.ETATS, ["En service"])
     nature = menuCoches(bpg, "Natures gardees", config.NATURES,
                                 ['Indifférenciée', 'Industriel, agricole ou commercial'])
     usage_1 = menuCoches(bpg, "Usages gardees", config.USAGE_1,
-                                ['Résidentiel', 'Commercial et services', 'Indifférencié', 'Industriel', 'Agricole'])
+                                ['Résidentiel', 'Commercial et services', 'Indifférencié', 'Industriel', 'Agricole'], aide = "beaucoup de batiments sont notés comme indifférenciés, bien qu'ils puissent être d'un usage particulier.")
 
-    sortie = menuCoches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), list(config.GROUPES_SORTIE))
+    sortie = menuCoches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), list(config.GROUPES_SORTIE), aide="colonnes gardées. Dans tout les cas les valeurs sont calculées, certaines peuvent être juste supprimées de la sortie finale.")
 
 
     #-------------choix zone-------------
@@ -207,7 +206,7 @@ if __name__ == "__main__":
         flottants = {
             "BUFFER": buffer, "MNH_MIN": mnh_min, "CAP": cap, "PAUSE_WFS": pause_wfs, "PAUSE_DL": pause_dl,
             "RENDEMENT_MODULE": rendement_module, "PERFORMANCE_RATIO": performance_ratio,
-            "TAUX_COUVERTURE": taux_couverture,
+            "TAUX_COUVERTURE": taux_couverture, "ALBEDO": albedo,
         }
         cases = {"CONSTRUCTION_LEGERE": const_leg}
         menus = {
@@ -363,14 +362,14 @@ if __name__ == "__main__":
     buffer      = champ2(bpp, "Tampon autour des batiments (m)", config.BUFFER)
     mnh_min     = champ2(bpp, "Hauteur min au-dessus du sol (m)", config.MNH_MIN)
 
-    n_directions = champ2(bpp, "Nombre de directions azimutales", config.N_DIRECTIONS)
+    n_directions = listeDeroulante(bpp, "Nombre de directions azimutales", config.DIVISEURS_360, config.N_DIRECTIONS,)
     dist_max_m   = champ2(bpp, "Rayon de recherche d'ombrage (m)", config.DIST_MAX_M)
     cap          = champ2(bpp, "Plafond solaire (deg)", config.CAP)
 
     rendement_module   = champ2(bpp, "Rendement du module PV", config.RENDEMENT_MODULE)
     performance_ratio  = champ2(bpp, "Performance ratio (pertes systeme)", config.PERFORMANCE_RATIO)
     taux_couverture    = champ2(bpp, "Taux de couverture du toit", config.TAUX_COUVERTURE)
-
+    albedo = champ2(bpp, "Albédo (réflectivité du sol)", config.ALBEDO)
 
 
     #======onglet 3======
