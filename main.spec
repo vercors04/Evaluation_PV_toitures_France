@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('data/tables', 'data/tables'), ('a_propos.md', '.'), ('executable/logo.ico', 'executable')]
+datas = [('data/tables', 'data/tables'), ('a_propos.md', '.'), ('sata/assets/logo_soleil.ico', 'executable')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pyproj')
@@ -58,7 +58,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='executable/logo.ico',
+    icon='data/assets/logo_soleil.ico',
 )
 coll = COLLECT(
     exe,
