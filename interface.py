@@ -327,8 +327,8 @@ if __name__ == "__main__":
                     barre["value"] = 0
                     for ligne in afficherBilan(item[1]):
                         ecrireLog(ligne + "\n")
-                    #rafraichirPP()
-                    #rafraichirSR()
+                    rafraichirPP()
+                    rafraichirSR()
 
                 elif item[0] == "error":
                     btn_lancer.configure(state="normal")
@@ -373,10 +373,10 @@ if __name__ == "__main__":
     taux_couverture    = champ2(bpp, "Taux de couverture du toit", config.TAUX_COUVERTURE)
     albedo = champ2(bpp, "Albédo (réflectivité du sol)", config.ALBEDO)
 
-    # bfg = boite(o2, "fichiers générés")  # boite fichiers generes
-    # bfg.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+    bfg = boite(o2, "fichiers générés")  # boite fichiers generes
+    bfg.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
-    # rafraichirPP = listesFichiers(bfg, config.DIR_GEOJSON, config.OUT_DIR_PROCESSED)
+    rafraichirPP = listesFichiers(bfg, config.DIR_GEOJSON, config.OUT_DIR_PROCESSED)
 
     #======onglet 3======
     o3 = onglet(nb, "Visualisation sur carte")
