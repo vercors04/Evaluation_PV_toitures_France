@@ -7,6 +7,8 @@ from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuC
 from src import config
 from src.pipeline import runPipeline
 from executable.tool_fct_exe import afficherBilan
+from executable.carte_interactive import generer_carte
+import webbrowser
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
@@ -374,7 +376,19 @@ if __name__ == "__main__":
 
     #======onglet 3======
     o3 = onglet(nb, "Visualisation sur carte")
- 
+    o3.columnconfigure(0, weight=1)
+    o3.rowconfigure(0, weight=1)
+    
+    b_carte = boite(o3, "Carte interactive des toitures")
+    b_carte.pack(fill="both", expand=True, padx=10, pady=10)
+
+    chemin_carte = os.path.abspath("carte.html")
+    generer_carte(chemin_carte)
+    ttk.Label(b_carte, text="La carte s'ouvrira directement dans votre navigateur.").pack(pady=40)
+    btn_carte = ttk.Button(b_carte, text="Ouvrir la carte", command=lambda: webbrowser.open(f"file://{chemin_carte}"))
+    btn_carte.pack(pady=10)
+
+
     
     #======onglet 4======
     o4 = onglet(nb, "Statistiques rapides")
