@@ -6,7 +6,7 @@ from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuC
                                        barreProgression, zoneLogs)
 from src import config
 from src.pipeline import runPipeline
-from executable.tool_fct_exe import afficherBilan
+from executable.tool_fct_exe import afficherBilan, listesFichiers, selecFichier
 from executable.carte_interactive import generer_carte
 import webbrowser
 
@@ -406,8 +406,11 @@ if __name__ == "__main__":
     bad = boite(o4, "gpkg calculés") #boite affichage dossier
     bad.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
 
-    bs = boite(o4, "statistiques") #boite affichage statistiques
-    bs.grid(row=0, column=1, rowspan=2, columnspan=2, sticky="nsew", padx=10, pady=10)
+    bas = boite(o4, "statistiques") #boite affichage statistiques
+    bas.grid(row=0, column=1, rowspan=2, columnspan=2, sticky="nsew", padx=10, pady=10)
+
+
+    
     rafraichirSR = selecFichier (bad, config.OUT_DIR_PROCESSED)
 
 

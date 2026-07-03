@@ -5,7 +5,7 @@ from folium.plugins import Geocoder
 import os 
 
 def generer_carte(fichier_sortie='carte.html'):
-    map = folium.Map(location=(46.862725, 2.287592),zoom_start=6.2)
+    map = folium.Map(location=(46.862725, 2.287592),zoom_start=6.2, tiles="CartoDB Positron", control_scale=True, prefer_canvas=True)
 
     folium.TileLayer(
         tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
