@@ -3,12 +3,11 @@ import queue, threading, requests, multiprocessing
 from tkinter import ttk
 from executable.tool_item_exe import (champ, case, champ2, fenetre, boite, menuCoches,
                                        onglets, radioBoutons, onglet, listeDeroulante,
-                                       barreProgression, zoneLogs)
+                                       barreProgression, zoneLogs, bouton)
 from src import config
 from src.pipeline import runPipeline
-from executable.tool_fct_exe import afficherBilan, listesFichiers, selecFichier
-from executable.carte_interactive import generer_carte
-import webbrowser
+from executable.tool_fct_exe import afficherBilan, listesFichiers, statsRapide
+from executable.carte_interactive import genererCarte, ouvrirCarte, viderCache
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
@@ -384,18 +383,45 @@ if __name__ == "__main__":
     o3 = onglet(nb, "Visualisation sur carte")
     o3.columnconfigure(0, weight=1)
     o3.rowconfigure(0, weight=1)
-    
-    b_carte = boite(o3, "Carte interactive des toitures")
-    b_carte.pack(fill="both", expand=True, padx=10, pady=10)
 
-    chemin_carte = os.path.abspath("carte.html")
-    generer_carte(chemin_carte)
-    ttk.Label(b_carte, text="La carte s'ouvrira directement dans votre navigateur.").pack(pady=40)
-    btn_carte = ttk.Button(b_carte, text="Ouvrir la carte", command=lambda: webbrowser.open(f"file://{chemin_carte}"))
-    btn_carte.pack(pady=10)
+    bvc = boite(o3, "carte interactive")  # boite visualisation carte
+    bvc.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+    ttk.Label(bvc, text="Génère la carte à partir des résultats calculés puis l'ouvre dans une fenêtre dédiée.\n"
+                        "Recliquer après un nouveau calcul pour la mettre à jour.").pack(pady=(30, 5))
+    btn_carte = bouton(bvc, "Afficher la carte", lambda: lancerCarte())
+
+    bouton(bvc, "Vider le cache", lambda: lancerViderCache(),
+           aide="Les statistiques de la carte sont mises en cache pour ne pas relire "
+                "les gpkg à chaque affichage. À vider uniquement si les contours "
+                "(data/contours) ont été mis à jour (ou pour libérer du stockage) : la carte sera entièrement "
+                "recalculée au prochain affichage (plusieurs minutes).")
+
+    etat_carte = ttk.Label(bvc, text="")
+    etat_carte.pack(pady=5)
+
+    def lancerViderCache():
+        viderCache()
+        etat_carte.configure(text="Cache vidé : tout sera recalculé au prochain affichage.")
+
+    #generation dans un thread (longue s'il y a de nouveaux resultats), affichage dans un process dedie
+    def lancerCarte():
+        btn_carte.configure(state="disabled")
+        etat_carte.configure(text="Préparation de la carte en cours, peut durer jusqu'à 20-30mn pour la France metropolitaine entière")
+        threading.Thread(target=travailCarte, daemon=True).start()
+
+    def travailCarte():
+        try:
+            chemin = genererCarte()
+            multiprocessing.Process(target=ouvrirCarte, args=(chemin,), daemon=True).start()
+            msg = "Carte ouverte."
+        except Exception as e:
+            msg = f"[ERREUR] {e}"
+        etat_carte.after(0, lambda: (etat_carte.configure(text=msg),
+                                     btn_carte.configure(state="normal")))
 
 
-    
+
     #======onglet 4======
     o4 = onglet(nb, "Statistiques rapides")
     o4.columnconfigure(0, weight=1, uniform="col")
@@ -411,7 +437,7 @@ if __name__ == "__main__":
 
 
     
-    rafraichirSR = selecFichier (bad, config.OUT_DIR_PROCESSED)
+    rafraichirSR = statsRapide (bad, config.OUT_DIR_PROCESSED, bas)
 
 
 

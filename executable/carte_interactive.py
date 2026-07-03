@@ -1,369 +1,517 @@
+"""
+Carte interactive des resultats calcules (folium), ouverte dans une fenetre native.
+
+Fonctionnement en deux temps, pour ne jamais refaire un calcul deja fait :
+  1. majStats() agrege chaque gpkg nouveau ou modifie en statistiques par commune,
+     conservees dans data/processed/stats_carte.json (cache incremental) ;
+  2. construireCarte() genere le HTML depuis ce cache. Contours embarques :
+     regions et departements de metropole, communes des seuls departements
+     ayant des donnees (le HTML reste leger).
+
+Trois niveaux (regions, departements, communes) bascules automatiquement selon
+le zoom. Chaque entite calculee a une popup de synthese et un bouton ouvrant un
+panneau de detail (moyenne / min / max par batiment de chaque colonne de sortie).
+
+Point d'entree interface : genererCarte() puis ouvrirCarte(chemin) dans un process.
+viderCache() supprime cache et HTML, a faire si les fichiers de contours changent.
+Test direct : python -m executable.carte_interactive
+"""
+import os
+import json
+
 import folium
-import geopandas as gpd
 import pandas as pd
+import geopandas as gpd
 from folium.plugins import Geocoder
-import os 
 
-def generer_carte(fichier_sortie='carte.html'):
-    map = folium.Map(location=(46.862725, 2.287592),zoom_start=6.2, tiles="CartoDB Positron", control_scale=True, prefer_canvas=True)
+from src import config
 
-    folium.TileLayer(
-        tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-        attr='Google',
-        name='Vue Satellite (Google)',
-        overlay=False,
-        control=True,
-        show=False
-    ).add_to(map)
 
-    css_menu = """
-    <style>
-    .leaflet-control-layers {
-        font-size: 18px;
-        line-height: 2.5;
-        padding: 20px;
-        width: 320px;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-        background-color: rgba(255, 255, 255, 0.95);
-    }
-    .leaflet-control-layers-list input[type="checkbox"] {
-        transform: scale(1.8);
-        margin-right: 15px;
-        cursor: pointer;
-    }
-    .leaflet-control-layers-label {
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-    }
-    </style>
+DIR_CONTOURS  = os.path.join(config.BASE_DATA, "data", "contours")
+FICHIER_STATS = os.path.join(config.BASE, "data", "processed", "stats_carte.json")
+FICHIER_CARTE = os.path.join(config.BASE, "data", "processed", "carte.html")
+
+REGIONS = ["auvergne-rhone-alpes", "bourgogne-franche-comte", "bretagne",
+           "centre-val-de-loire", "corse", "grand-est", "hauts-de-france",
+           "ile-de-france", "normandie", "nouvelle-aquitaine", "occitanie",
+           "pays-de-la-loire", "provence-alpes-cote-d-azur"]
+
+ZOOM_DEP = 8            # zoom a partir duquel les departements remplacent les regions
+ZOOM_COM = 11           # zoom a partir duquel les communes s'ajoutent
+SEUIL_DEP_COMPLET = 0.9  # part des communes avec donnees pour compter un departement entier
+
+# colonnes agregees : libelle affiche et unite ("Wh"/"Wc" : les gpkg sont en kWh / kWc)
+COLONNES = {
+    "hauteur_pts":       ("Hauteur du toit", "m"),
+    "nb_pixels":         ("Nombre de pixels de toit", ""),
+    "surf_tot_m2":       ("Surface totale", "m2"),
+    "surf_plate_m2":     ("Surface plate", "m2"),
+    "surf_incl_m2":      ("Surface inclinée, toutes orientations", "m2"),
+    "surf_incl_or_m2":   ("Surface inclinée orientée (azimut choisi)", "m2"),
+}
+COLONNES.update({f"surf_incl_{s}_m2": (f"Surface inclinée {s}", "m2") for s in config.SECTEURS})
+COLONNES.update({
+    "pente_moy_incl":    ("Pente moyenne des pans inclinés", "deg"),
+    "irr_an_kwh":        ("Irradiation reçue / an, toute la toiture", "Wh"),
+    "irr_an_kwh_orp":    ("Irradiation reçue / an, base installable", "Wh"),
+    "prod_an_kwh":       ("Production PV / an, toute la toiture", "Wh"),
+    "prod_an_kwh_orp":   ("Production PV / an, base installable", "Wh"),
+    "puissance_kwc_orp": ("Puissance installable", "Wc"),
+    "prod_T1_kwh_orp":   ("Production T1 (jan-mars)", "Wh"),
+    "prod_T2_kwh_orp":   ("Production T2 (avr-juin)", "Wh"),
+    "prod_T3_kwh_orp":   ("Production T3 (juil-sept)", "Wh"),
+    "prod_T4_kwh_orp":   ("Production T4 (oct-déc)", "Wh"),
+})
+
+
+def formater(valeur, unite):
     """
+    Formate une valeur avec un prefixe adapte (k, M, G, T, P pour Wh/Wc, km2 pour m2).
+    --------
+    @param[in] valeur : valeur numerique (NaN tolere)
+    @param[in] unite  : "Wh", "Wc", "m2", "m", "deg" ou ""
 
-    css_zoom_dynamique = """
-    <style>
-
-    .leaflet-zoom-8 .leaflet-interactive[stroke="#FFFFFF"], .leaflet-zoom-9 .leaflet-interactive[stroke="#FFFFFF"],
-    .leaflet-zoom-10 .leaflet-interactive[stroke="#FFFFFF"], .leaflet-zoom-11 .leaflet-interactive[stroke="#FFFFFF"],
-    .leaflet-zoom-12 .leaflet-interactive[stroke="#FFFFFF"], .leaflet-zoom-13 .leaflet-interactive[stroke="#FFFFFF"],
-    .leaflet-zoom-8 .leaflet-interactive[stroke="#ffffff"], .leaflet-zoom-9 .leaflet-interactive[stroke="#ffffff"],
-    .leaflet-zoom-10 .leaflet-interactive[stroke="#ffffff"], .leaflet-zoom-11 .leaflet-interactive[stroke="#ffffff"],
-    .leaflet-zoom-12 .leaflet-interactive[stroke="#ffffff"], .leaflet-zoom-13 .leaflet-interactive[stroke="#ffffff"] {
-        display: none !important;
-    }
-
-    .leaflet-zoom-1 .leaflet-interactive[stroke="#1A252C"], .leaflet-zoom-2 .leaflet-interactive[stroke="#1A252C"],
-    .leaflet-zoom-3 .leaflet-interactive[stroke="#1A252C"], .leaflet-zoom-4 .leaflet-interactive[stroke="#1A252C"],
-    .leaflet-zoom-5 .leaflet-interactive[stroke="#1A252C"], .leaflet-zoom-6 .leaflet-interactive[stroke="#1A252C"],
-    .leaflet-zoom-7 .leaflet-interactive[stroke="#1A252C"],
-    .leaflet-zoom-1 .leaflet-interactive[stroke="#1a252c"], .leaflet-zoom-2 .leaflet-interactive[stroke="#1a252c"],
-    .leaflet-zoom-3 .leaflet-interactive[stroke="#1a252c"], .leaflet-zoom-4 .leaflet-interactive[stroke="#1a252c"],
-    .leaflet-zoom-5 .leaflet-interactive[stroke="#1a252c"], .leaflet-zoom-6 .leaflet-interactive[stroke="#1a252c"],
-    .leaflet-zoom-7 .leaflet-interactive[stroke="#1a252c"] {
-        display: none ;
-    }
-
-    .leaflet-zoom-1 .leaflet-interactive[stroke="#7F8C8D"], .leaflet-zoom-2 .leaflet-interactive[stroke="#7F8C8D"],
-    .leaflet-zoom-3 .leaflet-interactive[stroke="#7F8C8D"], .leaflet-zoom-4 .leaflet-interactive[stroke="#7F8C8D"],
-    .leaflet-zoom-5 .leaflet-interactive[stroke="#7F8C8D"], .leaflet-zoom-6 .leaflet-interactive[stroke="#7F8C8D"],
-    .leaflet-zoom-7 .leaflet-interactive[stroke="#7F8C8D"], .leaflet-zoom-8 .leaflet-interactive[stroke="#7F8C8D"],
-    .leaflet-zoom-9 .leaflet-interactive[stroke="#7F8C8D"], .leaflet-zoom-10 .leaflet-interactive[stroke="#7F8C8D"],
-    .leaflet-zoom-1 .leaflet-interactive[stroke="#7f8c8d"], .leaflet-zoom-2 .leaflet-interactive[stroke="#7f8c8d"],
-    .leaflet-zoom-3 .leaflet-interactive[stroke="#7f8c8d"], .leaflet-zoom-4 .leaflet-interactive[stroke="#7f8c8d"],
-    .leaflet-zoom-5 .leaflet-interactive[stroke="#7f8c8d"], .leaflet-zoom-6 .leaflet-interactive[stroke="#7f8c8d"],
-    .leaflet-zoom-7 .leaflet-interactive[stroke="#7f8c8d"], .leaflet-zoom-8 .leaflet-interactive[stroke="#7f8c8d"],
-    .leaflet-zoom-9 .leaflet-interactive[stroke="#7f8c8d"], .leaflet-zoom-10 .leaflet-interactive[stroke="#7f8c8d"] {
-        display: none ;
-    }
-    </style>
+    @return chaine affichable ("-" si NaN)
     """
+    if valeur != valeur:
+        return "-"
+    if unite in ("Wh", "Wc"):
+        for seuil, prefixe in ((1e12, "P"), (1e9, "T"), (1e6, "G"), (1e3, "M")):
+            if abs(valeur) >= seuil:
+                return f"{valeur / seuil:.2f} {prefixe}{unite}"
+        return f"{valeur:.2f} k{unite}"
+    if unite == "m2" and abs(valeur) >= 1e6:
+        return f"{valeur / 1e6:.2f} km2"
+    if unite == "":
+        return f"{valeur:,.0f}".replace(",", " ")
+    return f"{valeur:,.1f} {unite}".replace(",", " ")
 
-    css_popup = """
-    <style>
-    .leaflet-popup-content-wrapper { background: #ffffff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 0; overflow: hidden; }
-    .leaflet-popup-tip { background: #ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-    .leaflet-popup-content { margin: 0 !important; width: 330px !important; }
-    .leaflet-popup-content table { width: 100%; border-collapse: collapse; font-family: 'Helvetica Neue', Arial, sans-serif; }
-    .leaflet-popup-content th, .leaflet-popup-content td { padding: 12px 15px; border-bottom: 1px solid #F0F3F4; }
-    .leaflet-popup-content tr:last-child th, .leaflet-popup-content tr:last-child td { border-bottom: none; }
 
-    .leaflet-popup-content th { font-size: 13px; font-weight: 600; text-align: left; width: 60%; }
-    .leaflet-popup-content td { font-size: 14px; font-weight: 900; text-align: right; }
-
-    .leaflet-popup-content tr:nth-child(1) { background: linear-gradient(135deg, #1A252C, #2C3E50); }
-    .leaflet-popup-content tr:nth-child(1) th { color: #E67E22; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-    .leaflet-popup-content tr:nth-child(1) td { color: #FFFFFF; font-size: 16px; }
-
-    .leaflet-popup-content tr:nth-child(2) { background-color: #F4FCF7; }
-    .leaflet-popup-content tr:nth-child(2) th, .leaflet-popup-content tr:nth-child(2) td { color: #27AE60; }
-
-    .leaflet-popup-content tr:nth-child(3) { background-color: #F0F8FF; }
-    .leaflet-popup-content tr:nth-child(3) th, .leaflet-popup-content tr:nth-child(3) td { color: #2980B9; }
-
-    .leaflet-popup-content tr:nth-child(4) { background-color: #FAF4FC; }
-    .leaflet-popup-content tr:nth-child(4) th, .leaflet-popup-content tr:nth-child(4) td { color: #8E44AD; }
-
-    .leaflet-popup-content tr:nth-child(5) { background-color: #FFFDF4; }
-    .leaflet-popup-content tr:nth-child(5) th, .leaflet-popup-content tr:nth-child(5) td { color: #D35400; }
-    </style>
+def chargerContours(niveau, regions=REGIONS):
     """
+    Concatene les contours des regions metropolitaines pour un niveau donne.
+    --------
+    @param[in] niveau  : "region", "departement" ou "communes"
+    @param[in] regions : sous-ensemble de REGIONS a charger (defaut : toutes)
 
-    js_moteur_zoom = """
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        let leafletMap = null;
-        for (let key in window) {
-            if (key.startsWith("map_") && window[key].getZoom) {
-                leafletMap = window[key];
-                break;
-            }
-        }
-        
-        if (leafletMap) {
-            let container = leafletMap.getContainer();
-            function updateZoomClass() {
-                let zoom = leafletMap.getZoom();
-                container.className = container.className.split(' ').filter(c => !c.startsWith('leaflet-zoom-')).join(' ');
-                container.classList.add('leaflet-zoom-' + zoom);
-            }
-            
-            leafletMap.on('zoomend', updateZoomClass);
-            updateZoomClass();
-        }
-    });
-    </script>
+    @return GeoDataFrame WGS84 (colonnes nom, code si present, region, geometry)
     """
-    map.get_root().html.add_child(folium.Element(js_moteur_zoom))
-    map.get_root().html.add_child(folium.Element(css_zoom_dynamique))
-    map.get_root().html.add_child(folium.Element(css_zoom_dynamique))
-    map.get_root().html.add_child(folium.Element(css_popup))
-    map.get_root().html.add_child(folium.Element(css_menu))
-
-    titre_html = '''
-    <div style="position: fixed; 
-                top: 20px; left: 50%; transform: translateX(-50%); width: auto; 
-                background-color: rgba(255, 255, 255, 0.98); 
-                border-radius: 30px; 
-                z-index: 9999; padding: 10px 25px; 
-                font-family: 'Helvetica Neue', Arial, sans-serif; 
-                font-size: 16px; letter-spacing: 0.5px; color: #1A252C; 
-                box-shadow: 0 4px 24px rgba(0,0,0,0.15);
-                border: 1px solid rgba(0,0,0,0.05);">
-        <span style="color: #E67E22; font-weight: bold; margin-right: 8px;">●</span>Évaluation du Potentiel Photovoltaïque des Toitures en France
-    </div>
-    '''
-
-    map.get_root().html.add_child(folium.Element(titre_html))
-
-    logo_html = '''
-    <div style="position: fixed; 
-                bottom: 25px; right: 25px; 
-                z-index: 9999; 
-                pointer-events: none;"> <img src="data/assets/logo_soleil.png" 
-            alt="Logo Projet" 
-            style="height: 60px; width: auto; 
-                    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.2));">
-    </div>
-    '''
-    map.get_root().html.add_child(folium.Element(logo_html))
-
-    Geocoder(position="topright", zoom=13,add_marker=True).add_to(map)
-
-    regions=["auvergne-rhone-alpes","bourgogne-franche-comte","bretagne","centre-val-de-loire","corse","grand-est","hauts-de-france","ile-de-france","normandie","nouvelle-aquitaine","occitanie","pays-de-la-loire","provence-alpes-cote-d-azur"]
-
-    groupe_regions = folium.FeatureGroup(name="1. Régions")
-    groupe_departements = folium.FeatureGroup(name="2. Départements")
-    groupe_commune=folium.FeatureGroup(name="3. Communes")
-
-    gdfs_communes = []
+    dossier, prefixe = {"region":      ("region", "region-"),
+                        "departement": ("departement", "departements-"),
+                        "communes":    ("communes", "communes-")}[niveau]
+    morceaux = []
     for reg in regions:
-        chemin_com = f"data/contours/communes/communes-{reg}.geojson"
-        if os.path.exists(chemin_com):
-            gdf_c = gpd.read_file(chemin_com)[['code', 'geometry']]
-            gdf_c['code_region_id'] = reg.replace("-"," ").title()
-            gdfs_communes.append(gdf_c)
-    gdf_toutes_communes = gpd.GeoDataFrame(pd.concat(gdfs_communes, ignore_index=True), crs="EPSG:4326")
+        chemin = os.path.join(DIR_CONTOURS, dossier, f"{prefixe}{reg}.geojson")
+        if not os.path.exists(chemin):
+            continue
+        g = gpd.read_file(chemin)
+        g["region"] = reg.replace("-", " ").title()
+        morceaux.append(g[[c for c in ("nom", "code", "region", "geometry") if c in g.columns]])
+    if not morceaux:
+        return gpd.GeoDataFrame(columns=["nom", "code", "region", "geometry"], crs="EPSG:4326")
+    return gpd.GeoDataFrame(pd.concat(morceaux, ignore_index=True), crs="EPSG:4326")
 
-    liste_gpkg=os.listdir("data/processed/gpkg")
-    noms_propres = sorted([dep.replace(".gpkg", "").replace("-", " ") for dep in liste_gpkg])
-    lignes_html = "".join([f'<li style="margin-bottom: 4px;"><span style="color:#E67E22; margin-right:6px; font-size:10px;">▶</span>{nom}</li>' for nom in noms_propres])
 
-    liste_bas_gauche = f'''
-    <div style="position: fixed; bottom: 25px; left: 25px; z-index: 9999; 
-                background-color: rgba(255, 255, 255, 0.95); 
-                padding: 15px 20px; border-radius: 12px; 
-                box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(0,0,0,0.08);
-                font-family: 'Helvetica Neue', Arial, sans-serif;
-                max-height: 280px; overflow-y: auto; width: 240px;">
-        <div style="font-size: 11px; color: #7F8C8D; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">
-            Base de données
-        </div>
-        <div style="font-size: 14px; color: #1A252C; margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid #EEE; padding-bottom: 6px;">
-            Secteurs traités ({len(noms_propres)})
-        </div>
-        <ul style="list-style-type: none; padding-left: 0; margin: 0; font-size: 13px; color: #2C3E50;">
-            {lignes_html}
-        </ul>
+def agregerGpkg(chemin, communes):
+    """
+    Resume un gpkg de resultats par commune : compte, somme, min et max des colonnes.
+    --------
+    @param[in] chemin   : chemin du .gpkg (1 ligne par batiment)
+    @param[in] communes : GeoDataFrame des contours de communes (code, geometry, WGS84)
+
+    @return dict {code_insee: {"n": int, "somme": {...}, "min": {...}, "max": {...}}}
+    """
+    try:
+        import pyogrio                                    # ne lit que les colonnes utiles
+        champs = list(pyogrio.read_info(chemin)["fields"])
+        gdf = gpd.read_file(chemin, columns=[c for c in COLONNES if c in champs])
+    except Exception:
+        gdf = gpd.read_file(chemin)
+    cols = [c for c in COLONNES if c in gdf.columns]
+
+    pts = gpd.GeoDataFrame(gdf[cols], geometry=gdf.geometry.representative_point(),
+                           crs=gdf.crs).to_crs(4326)
+    minx, miny, maxx, maxy = pts.total_bounds
+    proches = communes.cx[minx:maxx, miny:maxy]           # evite le sjoin France entiere
+    joint = gpd.sjoin(pts, proches[["code", "geometry"]], how="inner", predicate="within")
+
+    grp = joint.groupby("code")[cols]
+    sommes, minis, maxis = grp.sum(), grp.min(), grp.max()
+    tailles = joint.groupby("code").size()
+
+    return {code: {"n": int(tailles[code]),
+                   "somme": {c: float(sommes.at[code, c]) for c in cols},
+                   "min":   {c: float(minis.at[code, c]) for c in cols},
+                   "max":   {c: float(maxis.at[code, c]) for c in cols}}
+            for code in tailles.index}
+
+
+def majStats(on_log=print):
+    """
+    Met a jour le cache : agrege les gpkg nouveaux ou modifies, retire les disparus.
+    --------
+    @param[in] on_log : callback (message) pour suivre l'avancement
+
+    @return stats, change : contenu du cache et bool indiquant s'il a change
+    """
+    stats = {"fichiers": {}}
+    if os.path.exists(FICHIER_STATS):
+        try:
+            with open(FICHIER_STATS, encoding="utf-8") as f:
+                stats = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    presents = {}
+    if os.path.isdir(config.OUT_DIR_PROCESSED):
+        presents = {nom: os.path.getmtime(os.path.join(config.OUT_DIR_PROCESSED, nom))
+                    for nom in os.listdir(config.OUT_DIR_PROCESSED) if nom.endswith(".gpkg")}
+
+    change = False
+    for nom in list(stats["fichiers"]):                   # fichiers supprimes du dossier
+        if nom not in presents:
+            del stats["fichiers"][nom]
+            change = True
+
+    a_faire = [nom for nom, mtime in presents.items()
+               if stats["fichiers"].get(nom, {}).get("mtime") != mtime]
+    if a_faire:
+        communes = chargerContours("communes")
+        for nom in a_faire:
+            on_log(f"agregation de {nom}")
+            stats["fichiers"][nom] = {
+                "mtime": presents[nom],
+                "communes": agregerGpkg(os.path.join(config.OUT_DIR_PROCESSED, nom), communes)}
+            change = True
+
+    if change:
+        os.makedirs(os.path.dirname(FICHIER_STATS), exist_ok=True)
+        with open(FICHIER_STATS, "w", encoding="utf-8") as f:
+            json.dump(stats, f)
+    return stats, change
+
+
+def fusionnerCommunes(stats):
+    """
+    Fusionne les stats par commune de tous les fichiers. Si une commune apparait
+    dans plusieurs gpkg (ex : ville puis son departement), garde le fichier au
+    plus grand nombre de batiments pour ne pas compter deux fois.
+    --------
+    @param[in] stats : contenu du cache (cle "fichiers")
+
+    @return dict {code_insee: stats de la commune}
+    """
+    communes = {}
+    for fichier in stats["fichiers"].values():
+        for code, d in fichier["communes"].items():
+            if code not in communes or d["n"] > communes[code]["n"]:
+                communes[code] = d
+    return communes
+
+
+def enTableau(communes):
+    """Passe le dict des communes en DataFrame plat (colonnes X_s / X_mn / X_mx)."""
+    lignes = []
+    for code, d in communes.items():
+        ligne = {"code": code, "n": d["n"]}
+        ligne.update({f"{c}_s": v for c, v in d["somme"].items()})
+        ligne.update({f"{c}_mn": v for c, v in d["min"].items()})
+        ligne.update({f"{c}_mx": v for c, v in d["max"].items()})
+        lignes.append(ligne)
+    return pd.DataFrame(lignes) if lignes else pd.DataFrame(columns=["code", "n"])
+
+
+def agreger(df, cle):
+    """Agrege un tableau plat par cle : sommes des X_s et n, min des X_mn, max des X_mx."""
+    agg = {"n": "sum"}
+    agg.update({c: "sum" for c in df.columns if c.endswith("_s")})
+    agg.update({c: "min" for c in df.columns if c.endswith("_mn")})
+    agg.update({c: "max" for c in df.columns if c.endswith("_mx")})
+    return df.groupby(cle, as_index=False).agg(agg)
+
+
+def colonne(df, nom):
+    """Colonne du DataFrame, ou colonne de NaN si absente."""
+    return df[nom] if nom in df.columns else pd.Series(float("nan"), index=df.index)
+
+
+def valeursDetails(ligne, colonnes):
+    """Liste [moyenne, min, max] formatee par entree de COLONNES (None si absente)."""
+    vals = []
+    for c, (_, unite) in COLONNES.items():
+        if f"{c}_s" in colonnes and pd.notna(ligne.get(f"{c}_s")) and ligne["n"] > 0:
+            vals.append([formater(ligne[f"{c}_s"] / ligne["n"], unite),
+                         formater(ligne[f"{c}_mn"], unite),
+                         formater(ligne[f"{c}_mx"], unite)])
+        else:
+            vals.append(None)
+    return vals
+
+
+def preparer(contours, df, cle_contours, cle_df, prefixe, details, titres):
+    """
+    Joint les stats aux contours et fabrique les colonnes texte de la popup
+    (production, toitures, parts plate / inclinee, bouton de detail).
+    Remplit au passage les dicts details et titres pour le panneau lateral.
+    --------
+    @return GeoDataFrame reduit a (nom, geometry, colonnes de popup)
+    """
+    g = contours.merge(df, left_on=cle_contours, right_on=cle_df, how="left")
+
+    n     = colonne(g, "n")
+    prod  = colonne(g, "prod_an_kwh_s")
+    tot   = colonne(g, "surf_tot_m2_s")
+    plate = colonne(g, "surf_plate_m2_s")
+    pct   = (plate / tot * 100).where(tot > 0)
+
+    g["p_prod"] = prod.map(lambda v: formater(v, "Wh"))
+    g["p_toit"] = n.map(lambda v: formater(v, ""))
+    g["p_plat"] = pct.map(lambda v: "-" if v != v else f"{v:.1f} %")
+    g["p_incl"] = pct.map(lambda v: "-" if v != v else f"{100 - v:.1f} %")
+
+    boutons = []
+    for _, ligne in g.iterrows():
+        if pd.notna(ligne.get("n")):
+            cle = prefixe + str(ligne[cle_contours])
+            details[cle] = valeursDetails(ligne, g.columns)
+            titres[cle] = str(ligne["nom"])
+            boutons.append(f"<button class=\"btn-details\" "
+                           f"onclick=\"montrerDetails('{cle}')\">Voir le détail</button>")
+        else:
+            boutons.append("")
+    g["p_btn"] = boutons
+
+    for c in ("p_prod", "p_toit", "p_plat", "p_incl"):
+        g[c] = g[c].replace("-", "Non calculé")
+    return g[["nom", "geometry", "p_prod", "p_toit", "p_plat", "p_incl", "p_btn"]]
+
+
+def couche(gdf, alias_nom, couleur, epaisseur, note="", zoom_on_click=False):
+    """Couche folium d'un niveau : contours + tooltip + popup de synthese."""
+    return folium.GeoJson(
+        gdf,
+        zoom_on_click=zoom_on_click,
+        style_function=lambda x: {"color": couleur, "weight": epaisseur, "fillColor": "#E67E22",
+                                  "fillOpacity": 0.18 if x["properties"]["p_btn"] else 0.0},
+        highlight_function=lambda x: {"fillColor": "#FBFF00", "fillOpacity": 0.35},
+        tooltip=folium.GeoJsonTooltip(fields=["nom"], aliases=[alias_nom]),
+        popup=folium.GeoJsonPopup(
+            fields=["nom", "p_prod", "p_toit", "p_plat", "p_incl", "p_btn"],
+            aliases=[alias_nom, f"Production PV / an{note} :", f"Nb de toitures{note} :",
+                     "Toits plats :", "Toits inclinés :", ""]))
+
+
+def construireCarte(stats):
+    """
+    Genere le HTML de la carte depuis le cache de stats.
+    --------
+    @param[in] stats : contenu du cache (voir majStats)
+
+    @return chemin du HTML ecrit (FICHIER_CARTE)
+    """
+    gdf_reg = chargerContours("region")
+    gdf_dep = chargerContours("departement").drop_duplicates("code")
+    gdf_reg["geometry"] = gdf_reg.geometry.simplify(0.002, preserve_topology=True)
+    gdf_dep["geometry"] = gdf_dep.geometry.simplify(0.002, preserve_topology=True)
+
+    # stats par commune depuis le cache ; seules les regions avec donnees sont chargees
+    df_com = enTableau(fusionnerCommunes(stats))
+    df_com["dep"] = df_com["code"].str[:2]
+    dep_region = gdf_dep.set_index("code")["region"]
+    regions_avec = {dep_region.get(d) for d in set(df_com["dep"])} - {None}
+    gdf_com = chargerContours("communes", [r for r in REGIONS
+                                           if r.replace("-", " ").title() in regions_avec])
+
+    # departements montres si quasi complets
+    total_par_dep = gdf_com.groupby(gdf_com["code"].str[:2]).size()
+    avec_par_dep  = df_com.groupby("dep").size()
+    complets = [d for d, nb in avec_par_dep.items()
+                if nb >= SEUIL_DEP_COMPLET * total_par_dep.get(d, float("inf"))]
+
+    df_dep = agreger(df_com[df_com["dep"].isin(complets)].drop(columns="code"), "dep")
+    df_dep["region"] = df_dep["dep"].map(gdf_dep.set_index("code")["region"])
+    df_reg = agreger(df_dep.drop(columns="dep"), "region")
+
+    # seules les communes des departements avec donnees sont gardees, puis simplifiees
+    gdf_com = gdf_com[gdf_com["code"].str[:2].isin(set(df_com["dep"]))].copy()
+    gdf_com["geometry"] = gdf_com.geometry.simplify(0.001, preserve_topology=True)
+
+    # jointure stats + contours, popups, panneau de detail
+    details, titres = {}, {}
+    g_reg = preparer(gdf_reg, df_reg, "region", "region", "r", details, titres)
+    g_dep = preparer(gdf_dep, df_dep.drop(columns="region"), "code", "dep", "d", details, titres)
+    g_com = preparer(gdf_com, df_com, "code", "code", "c", details, titres)
+
+    carte = folium.Map(location=(46.8, 2.3), zoom_start=6, tiles="CartoDB Positron",
+                       control_scale=True, prefer_canvas=True)
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri", name="Vue satellite", overlay=False, control=True, show=False).add_to(carte)
+    Geocoder(position="topright", zoom=13, add_marker=False).add_to(carte)
+
+    fg_reg = folium.FeatureGroup(name="Régions", control=False)
+    fg_dep = folium.FeatureGroup(name="Départements", control=False, show=False)
+    fg_com = folium.FeatureGroup(name="Communes", control=False, show=False)
+    couche(g_reg, "Région :", "#FFFFFF", 2, note=" (dép. complets)", zoom_on_click=True).add_to(fg_reg)
+    couche(g_dep, "Département :", "#1A252C", 1.5).add_to(fg_dep)
+    if not g_com.empty:
+        couche(g_com, "Commune :", "#7F8C8D", 1.2).add_to(fg_com)
+    fg_reg.add_to(carte)
+    fg_dep.add_to(carte)
+    fg_com.add_to(carte)
+    folium.LayerControl(position="topleft", collapsed=True).add_to(carte)
+
+    # bascule automatique des niveaux selon le zoom
+    niveaux = [f"[{fg_reg.get_name()}, 0, {ZOOM_DEP}]",
+               f"[{fg_dep.get_name()}, {ZOOM_DEP}, 99]",
+               f"[{fg_com.get_name()}, {ZOOM_COM}, 99]"]
+    js_zoom = f"""
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {{
+        var carte = {carte.get_name()};
+        var niveaux = [{", ".join(niveaux)}];
+        function majNiveaux() {{
+            var z = carte.getZoom();
+            niveaux.forEach(function (nv) {{
+                if (z >= nv[1] && z < nv[2]) {{ if (!carte.hasLayer(nv[0])) carte.addLayer(nv[0]); }}
+                else {{ if (carte.hasLayer(nv[0])) carte.removeLayer(nv[0]); }}
+            }});
+        }}
+        carte.on("zoomend", majNiveaux);
+        majNiveaux();
+    }});
+    </script>"""
+
+    # panneau lateral de detail, rempli au clic sur le bouton d'une popup
+    libelles = [lib for lib, _ in COLONNES.values()]
+    js_details = f"""
+    <div id="panneau-details">
+        <span id="detail-fermer" onclick="fermerDetails()">&#10005;</span>
+        <div id="detail-contenu"></div>
     </div>
-    '''
-    map.get_root().html.add_child(folium.Element(liste_bas_gauche))
+    <script>
+    var LIBELLES = {json.dumps(libelles, ensure_ascii=False)};
+    var TITRES = {json.dumps(titres, ensure_ascii=False)};
+    var DETAILS = {json.dumps(details, ensure_ascii=False)};
+    function montrerDetails(cle) {{
+        var d = DETAILS[cle];
+        if (!d) return;
+        var html = "<h3>" + TITRES[cle] + "</h3><p class='detail-note'>valeurs par bâtiment</p>";
+        html += "<table><tr><th></th><th>moyenne</th><th>min</th><th>max</th></tr>";
+        for (var i = 0; i < d.length; i++) {{
+            if (!d[i]) continue;
+            html += "<tr><th>" + LIBELLES[i] + "</th><td>" + d[i][0] + "</td><td>"
+                  + d[i][1] + "</td><td>" + d[i][2] + "</td></tr>";
+        }}
+        document.getElementById("detail-contenu").innerHTML = html + "</table>";
+        document.getElementById("panneau-details").style.display = "block";
+    }}
+    function fermerDetails() {{
+        document.getElementById("panneau-details").style.display = "none";
+    }}
+    </script>"""
+
+    css = """
+    <style>
+    .leaflet-popup-content-wrapper { border-radius: 10px; }
+    .leaflet-popup-content { margin: 10px 14px; width: 300px !important; }
+    .leaflet-popup-content table { width: 100%; border-collapse: collapse;
+                                   font-family: Arial, sans-serif; }
+    .leaflet-popup-content th, .leaflet-popup-content td { padding: 5px 6px;
+        border-bottom: 1px solid #eee; font-size: 12.5px; }
+    .leaflet-popup-content th { text-align: left; color: #555; font-weight: 600; }
+    .leaflet-popup-content td { text-align: right; font-weight: 700; color: #1A252C; }
+    .btn-details { cursor: pointer; border: none; border-radius: 6px; padding: 5px 10px;
+                   background: #E67E22; color: white; font-weight: 600; }
+    #panneau-details { position: fixed; top: 80px; right: 15px; width: 480px;
+        max-height: 75%; overflow-y: auto; display: none; z-index: 9999;
+        background: #fff; border-radius: 12px; padding: 15px 20px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.25); font-family: Arial, sans-serif; }
+    #panneau-details h3 { margin: 0 0 2px 0; color: #1A252C; }
+    #panneau-details .detail-note { margin: 0 0 10px 0; color: #7F8C8D; font-size: 12px; }
+    #panneau-details table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    #panneau-details th, #panneau-details td { padding: 4px 6px;
+        border-bottom: 1px solid #eee; text-align: right; }
+    #panneau-details th { text-align: left; color: #555; font-weight: 600; }
+    #detail-fermer { float: right; cursor: pointer; color: #7F8C8D; font-size: 16px; }
+    </style>"""
+
+    titre = """
+    <div style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+                background-color: rgba(255,255,255,0.98); border-radius: 30px;
+                z-index: 9999; padding: 10px 25px;
+                font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 16px;
+                color: #1A252C; box-shadow: 0 4px 24px rgba(0,0,0,0.15);">
+        <span style="color: #E67E22; font-weight: bold; margin-right: 8px;">&#9679;</span>
+        Évaluation du Potentiel Photovoltaïque des Toitures en France
+    </div>"""
+
+    noms = sorted(nom.replace(".gpkg", "").replace("-", " ") for nom in stats["fichiers"])
+    lignes = "".join(f'<li>{nom}</li>' for nom in noms)
+    secteurs = f"""
+    <div style="position: fixed; bottom: 25px; left: 25px; z-index: 9999;
+                background-color: rgba(255,255,255,0.95); padding: 12px 18px;
+                border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                font-family: Arial, sans-serif; max-height: 260px; overflow-y: auto;">
+        <div style="font-size: 13px; font-weight: bold; color: #1A252C;
+                    border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 6px;">
+            Secteurs traités ({len(noms)})</div>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 12.5px;
+                   color: #2C3E50; line-height: 1.7;">{lignes}</ul>
+    </div>"""
+
+    for element in (css, titre, secteurs, js_details, js_zoom):
+        carte.get_root().html.add_child(folium.Element(element))
+
+    os.makedirs(os.path.dirname(FICHIER_CARTE), exist_ok=True)
+    carte.save(FICHIER_CARTE)
+    return FICHIER_CARTE
 
 
-    stats_dep = []
-    stats_com_list = []
-    deps_complets = set()
+def genererCarte(on_log=print):
+    """
+    Met a jour le cache de stats puis regenere le HTML seulement si necessaire.
+    --------
+    @param[in] on_log : callback (message) pour suivre l'avancement
 
-    for dep in liste_gpkg:
-            chemin_toits=f"data/processed/gpkg/{dep}"
-            gdf=gpd.read_file(chemin_toits)
-            
-            surf_tot_globale=gdf['surf_tot_m2'].sum()
-            somme_plate = gdf['surf_plate_m2'].sum()
+    @return chemin du HTML de la carte
+    """
+    stats, change = majStats(on_log)
+    if change or not os.path.exists(FICHIER_CARTE):
+        on_log("construction de la carte")
+        construireCarte(stats)
+    return FICHIER_CARTE
 
-            prod_kwh=gdf["prod_an_kwh"].sum()
-            prod_twh = round(prod_kwh / 1e9, 3)
 
-            stats_dep.append({
-                "nom": dep,
-                "production_estimee": prod_twh,
-                "nombre_toitures": len(gdf),
-                "prop_plat": (somme_plate / surf_tot_globale) * 100 if surf_tot_globale > 0 else 0,
-                "prop_incl": 100 - ((somme_plate / surf_tot_globale) * 100) if surf_tot_globale > 0 else 0
-            })
-            
-            
-            gdf_points = gpd.GeoDataFrame(gdf[['surf_tot_m2', 'surf_plate_m2', 'prod_an_kwh']], geometry=gdf.centroid, crs=gdf.crs)
-        
-            gdf_points = gdf_points.to_crs("EPSG:4326")
-            gdf_croise = gpd.sjoin(gdf_points, gdf_toutes_communes, how="inner", predicate="within")
-            counts_commune = gdf_croise['code'].value_counts(normalize=True)
-            commune_majoritaire = counts_commune.idxmax()
-            proportion_max = counts_commune.max()
-            
-            if proportion_max > 0.70:
-                gdf_croise = gdf_croise[gdf_croise['code'] == commune_majoritaire]
-            else:
-                gdf_croise['code_dep_temp'] = gdf_croise['code'].astype(str).str[:2]
-                dep_majoritaire = gdf_croise['code_dep_temp'].mode()[0]
-                gdf_croise = gdf_croise[gdf_croise['code_dep_temp'] == dep_majoritaire]
-                deps_complets.add(dep_majoritaire)
+def viderCache():
+    """
+    Supprime le cache de stats et le HTML : tout sera reconstruit au prochain
+    affichage (plusieurs minutes). Necessaire apres une mise a jour des fichiers
+    de contours (data/contours), sinon les codes INSEE du cache peuvent ne plus
+    correspondre aux nouveaux contours.
+    """
+    for chemin in (FICHIER_STATS, FICHIER_CARTE):
+        if os.path.exists(chemin):
+            os.remove(chemin)
 
-            group = gdf_croise.groupby(['code','code_region_id']).agg(
-            surf_tot_globale=('surf_tot_m2', 'sum'),
-            somme_plate=('surf_plate_m2', 'sum'),
-            prod_kwh=('prod_an_kwh', 'sum'),
-            nombre_toitures=('code', 'size') 
-            ).reset_index()
 
-            stats_com_list.append(group)
-            
-            del gdf, gdf_points, gdf_croise
+def ouvrirCarte(chemin):
+    """
+    Ouvre la carte dans une fenetre native (pywebview / WebView2). A lancer dans
+    un process dedie depuis l'interface : la boucle pywebview est bloquante.
+    Sans pywebview, repli sur le navigateur par defaut.
+    --------
+    @param[in] chemin : chemin du HTML a afficher
+    """
+    try:
+        import webview
+    except ImportError:
+        import webbrowser
+        webbrowser.open("file:///" + os.path.abspath(chemin).replace("\\", "/"))
+        return
+    webview.create_window("Carte des toitures", chemin, width=1200, height=800)
+    webview.start()
 
-    df_stats_com_raw = pd.concat(stats_com_list, ignore_index=True)
-    df_stats_com = df_stats_com_raw.groupby(['code', 'code_region_id']).agg(
-        surf_tot_globale=('surf_tot_globale', 'sum'),
-        somme_plate=('somme_plate', 'sum'),
-        prod_kwh=('prod_kwh', 'sum'),
-        nombre_toitures=('nombre_toitures', 'sum')
-    ).reset_index()
-
-    df_stats_com['production_estimee'] = (df_stats_com['prod_kwh'] / 1e6).round(5)
-    df_stats_com['prop_plat'] = (df_stats_com['somme_plate'] / df_stats_com['surf_tot_globale']) * 100
-    df_stats_com['prop_plat'] = df_stats_com['prop_plat'].fillna(0)
-    df_stats_com['prop_incl'] = 100 - df_stats_com['prop_plat']
-
-    df_stats_com['code_dep'] = df_stats_com['code'].astype(str).str[:2]
-    df_stats_com_pour_dep = df_stats_com[df_stats_com['code_dep'].isin(deps_complets)]
-
-    df_stats_dep = df_stats_com_pour_dep.groupby(['code_dep', 'code_region_id']).agg(
-        surf_tot_globale=('surf_tot_globale', 'sum'),
-        somme_plate=('somme_plate', 'sum'),
-        prod_kwh=('prod_kwh', 'sum'),
-        nombre_toitures=('nombre_toitures', 'sum')
-    ).reset_index()
-
-    df_stats_dep['production_estimee'] = (df_stats_dep['prod_kwh'] / 1e9).round(3)
-    df_stats_dep['prop_plat'] = (df_stats_dep['somme_plate'] / df_stats_dep['surf_tot_globale']) * 100
-    df_stats_dep['prop_plat'] = df_stats_dep['prop_plat'].fillna(0)
-    df_stats_dep['prop_incl'] = 100 - df_stats_dep['prop_plat']
-
-    df_stats_reg = df_stats_dep.groupby('code_region_id').agg(
-        surf_tot_globale=('surf_tot_globale', 'sum'),
-        somme_plate=('somme_plate', 'sum'),
-        prod_kwh=('prod_kwh', 'sum'),
-        nombre_toitures=('nombre_toitures', 'sum')
-    ).reset_index()
-
-    df_stats_reg['production_estimee'] = (df_stats_reg['prod_kwh'] / 1e9).round(3)
-    df_stats_reg['prop_plat'] = (df_stats_reg['somme_plate'] / df_stats_reg['surf_tot_globale']) * 100
-    df_stats_reg['prop_plat'] = df_stats_reg['prop_plat'].fillna(0)
-    df_stats_reg['prop_incl'] = 100 - df_stats_reg['prop_plat']
-    colonnes_stats = ["production_estimee", "nombre_toitures", "prop_plat", "prop_incl"]
-    for region in regions:
-        chemin="data/contours/region/region-" + region + ".geojson"
-        chemin_dep="data/contours/departement/departements-" + region + ".geojson"
-        chemin_com="data/contours/communes/communes-" + region + ".geojson"
-
-        nom_propre_region = region.replace("-"," ").title()
-
-        gdf_contours_reg = gpd.read_file(chemin)
-        gdf_contours_reg['region_key'] = nom_propre_region
-        gdf_contours_reg = gdf_contours_reg.merge(df_stats_reg, left_on="region_key", right_on="code_region_id", how="left")
-        gdf_contours_reg[colonnes_stats] = gdf_contours_reg[colonnes_stats].fillna("Non calculé")
-        folium.GeoJson(gdf_contours_reg, 
-                    name=region.replace("-"," ").title()
-                    ,zoom_on_click=True
-                    ,style_function=lambda x: {"color": "#FFFFFF", "weight": 2, "fillOpacity": 0},
-                    highlight_function=lambda x: {"fillColor": "#1A252C", "fillOpacity": 0.2},
-                    tooltip=folium.GeoJsonTooltip(fields=["nom"], aliases=["Région :"]),
-                    popup=folium.GeoJsonPopup(
-                            fields=["nom", "production_estimee", "nombre_toitures", "prop_plat", "prop_incl"], 
-                            aliases=["Région :", "Production totale (TWh/an) :", "Nb de toitures :", "Toits plats (%) :", "Toits inclinés (%) :"],
-                        )
-                    ).add_to(groupe_regions)
-
-        gdf_contours_dep = gpd.read_file(chemin_dep)
-        gdf_contours_dep['code'] = gdf_contours_dep['code'].astype(str)
-        gdf_contours_dep = gdf_contours_dep.merge(df_stats_dep, left_on="code", right_on="code_dep", how="left")
-        gdf_contours_dep[colonnes_stats] = gdf_contours_dep[colonnes_stats].fillna("Non calculé")
-        gdf_contours_dep[colonnes_stats] = gdf_contours_dep[colonnes_stats].fillna("Non calculé")
-        folium.GeoJson(gdf_contours_dep,
-                        name=region.replace("-"," ").title() + " (Départements)",
-                        style_function=lambda x: {"color": "#1A252C", "weight": 1.5, "fillOpacity": 0.1, "fillColor": "#2C3E50"},
-                        highlight_function=lambda x: {"fillColor": "#FFFFFF", "color": "#FFFFFF", "weight": 2.5, "fillOpacity": 0.3},
-                        popup=folium.GeoJsonPopup(
-                            fields=["nom", "production_estimee", "nombre_toitures", "prop_plat", "prop_incl"], 
-                            aliases=["Département :", "Production totale (TWh/an) :", "Nb de toitures :", "Toits plats (%) :", "Toits inclinés (%) :"],
-                            )
-                        ).add_to(groupe_departements)
-        
-        gdf_communes = gpd.read_file(chemin_com)
-        gdf_communes['geometry'] = gdf_communes['geometry'].simplify(tolerance=0.001, preserve_topology=True)
-        gdf_communes = gdf_communes.merge(df_stats_com, on="code", how="left")
-        
-        for col in colonnes_stats:
-                if col not in gdf_communes.columns:
-                    gdf_communes[col] = "Non calculé"
-        gdf_communes[colonnes_stats] = gdf_communes[colonnes_stats].fillna("Non calculé")
-        folium.GeoJson(gdf_communes, 
-                    name=region.replace("-"," ").title()+ " (Commune)"
-                    ,zoom_on_click=True
-                    ,style_function=lambda x: {"color": "#7F8C8D", "weight": 1.2, "fillOpacity": 0},
-                    highlight_function=lambda x: {"fillColor": "#FFFFFF", "color": "#1A252C", "weight": 1.5, "fillOpacity": 0.4},
-                    popup=folium.GeoJsonPopup(
-                            fields=["nom", "production_estimee", "nombre_toitures", "prop_plat", "prop_incl"], 
-                            aliases=["Commune :", "Production totale (GWh/an) :", "Nb de toitures :", "Toits plats (%) :", "Toits inclinés (%) :"],
-                            ),
-                        tooltip=folium.GeoJsonTooltip(fields=["nom"], aliases=["Commune :"])
-                    ).add_to(groupe_commune)
-
-    groupe_regions.add_to(map)
-    groupe_departements.add_to(map)
-    groupe_commune.add_to(map)
-
-    folium.LayerControl(position='topleft', collapsed=False).add_to(map)
-
-    map.save('carte.html')
-    return map
 
 if __name__ == "__main__":
-    generer_carte()
+    ouvrirCarte(genererCarte())

@@ -18,6 +18,25 @@ def bulleAide(parent, message):
     q.bind("<Button-1>", lambda e: messagebox.showinfo("Aide", message))
 
 
+def bouton(parent, libelle, commande, aide=None):
+    """
+    Un bouton avec bulle d'aide optionnelle, range automatiquement dans parent.
+    --------
+    @param[in] parent   : la boite ou ranger le bouton
+    @param[in] libelle  : texte du bouton
+    @param[in] commande : fonction appelee au clic
+    @param[in] aide     : texte de la bulle d'aide (optionnel)
+
+    @return Button : le bouton (modifier avec .configure(state=...))
+    """
+    ligne = ttk.Frame(parent); ligne.pack(pady=5)
+    b = ttk.Button(ligne, text=libelle, command=commande)
+    b.pack(side="left")
+    if aide:
+        bulleAide(ligne, aide)
+    return b
+
+
 def fenetre(titre="", largeur=600, hauteur=400):
     """
     Cree la fenetre principale.

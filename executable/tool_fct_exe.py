@@ -1,6 +1,7 @@
 from tkinter import ttk, messagebox
 import tkinter as tk
 import os
+import geopandas as gpd 
 
 def formaterDuree(secondes):
     """
@@ -120,12 +121,17 @@ def listesFichiers(parent, geojson_dir, gpkg_dir):
     return rafraichir
 
 
-def selecFichier(parent, gpkg_dir):
-    parent.columnconfigure(1, weight=1)
-    parent.rowconfigure(1, weight=1)
+def statsRapide(parent_selec, gpkg_dir, parent_stats):
+    parent_selec.columnconfigure(1, weight=1)
+    parent_selec.rowconfigure(1, weight=1)
 
-    liste_gpkg = tk.Listbox(parent,  selectmode="extended")
+    liste_gpkg = tk.Listbox(parent_selec,  selectmode="extended")
     liste_gpkg.grid(row=1, column=1, sticky="nsew", padx=2)
+
+    zone_stats = tk.Text(parent_stats)
+    zone_stats.pack(fill="both", expand=True)
+    zone_stats.configure(state="disabled")
+
 
     def rafraichir():
         liste_gpkg.delete(0, "end")
@@ -133,8 +139,81 @@ def selecFichier(parent, gpkg_dir):
             for nom in sorted(os.listdir(gpkg_dir)):
                 liste_gpkg.insert("end", nom)
 
-    ttk.Button(parent, text="rafraichir",
+    def stats():
+        def conv (valeur, unite):
+            if unite not in ("Wh", "Wc"):
+                return f"{valeur:.1f} {unite}".strip()
+
+            if valeur >= 1e12:
+                return f"{valeur/1e12:.2f} P{unite}"
+            if valeur >= 1e9:
+                return f"{valeur/1e9:.2f} T{unite}"
+            if valeur >= 1e6:
+                return f"{valeur/1e6:.2f} G{unite}"
+            if valeur >= 1e3:
+                return f"{valeur/1e3:.2f} M{unite}"
+            if valeur >= 1:
+                return f"{valeur:.2f} k{unite}"
+            if valeur >= 1e-3:
+                return f"{valeur*1e3:.2f} {unite}"
+            return f"{valeur*1e6:.4f} m{unite}"
+
+        zone = liste_gpkg.curselection()
+        if not zone:
+            return
+        nom = liste_gpkg.get(zone[0])
+        gdf = gpd.read_file(os.path.join(gpkg_dir, nom))
+
+        colonnes = {
+            "hauteur_pts":       ("Hauteur du toit", "m"),
+            "nb_pixels":         ("Nombre de pixels de toit", ""),
+            "surf_tot_m2":       ("Surface totale ", "m2"),
+            "surf_plate_m2":     ("Surface plate", "m2"),
+            "surf_incl_m2":      ("Surface inclinee, toutes orientations", "m2"),
+            "surf_incl_or_m2":   ("Surface inclinee orientee (azimut choisi)", "m2"),
+            "surf_incl_N_m2":    ("Surface inclinee orientee Nord", "m2"),
+            "surf_incl_NE_m2":   ("Surface inclinee orientee Nord-Est", "m2"),
+            "surf_incl_E_m2":    ("Surface inclinee orientee Est", "m2"),
+            "surf_incl_SE_m2":   ("Surface inclinee orientee Sud-Est", "m2"),
+            "surf_incl_S_m2":    ("Surface inclinee orientee Sud", "m2"),
+            "surf_incl_SO_m2":   ("Surface inclinee orientee Sud-Ouest", "m2"),
+            "surf_incl_O_m2":    ("Surface inclinee orientee Ouest", "m2"),
+            "surf_incl_NO_m2":   ("Surface inclinee orientee Nord-Ouest", "m2"),
+            "irr_an_kwh":        ("Irradiation recue par an, toute la toiture", "Wh"),
+            "pente_moy_incl":    ("Pente moyenne des pans inclines, toutes orientations", "deg"),
+            "irr_an_kwh_orp":    ("Irradiation recue par an, base installable (plat + oriente)", "Wh"),
+            "prod_an_kwh":       ("Production PV par an, toute la toiture", "Wh"),
+            "prod_an_kwh_orp":   ("Production PV par an, base installable (plat + oriente)", "Wh"),
+            "puissance_kwc_orp": ("Puissance installable, base installable (plat + oriente)", "Wc"),
+            "prod_T1_kwh_orp":   ("Production PV trimestre 1 (jan-fev-mar), base installable", "Wh"),
+            "prod_T2_kwh_orp":   ("Production PV trimestre 2 (avr-mai-juin), base installable", "Wh"),
+            "prod_T3_kwh_orp":   ("Production PV trimestre 3 (juil-aout-sept), base installable", "Wh"),
+            "prod_T4_kwh_orp":   ("Production PV trimestre 4 (oct-nov-dec), base installable", "Wh"),
+        }
+
+        lignes = [f"Fichier : {nom}", f"Nombre de toitures : {len(gdf)}", ""]
+
+        for nom_colonne, (libelle, unite) in colonnes.items():
+            if nom_colonne not in gdf.columns:
+                continue   
+            moyenne = conv(gdf[nom_colonne].mean(), unite)
+            minimum = conv(gdf[nom_colonne].min(), unite)
+            maximum = conv(gdf[nom_colonne].max(), unite)
+            lignes.append(f"{libelle:<30}: moyenne={moyenne}  min={minimum}  max={maximum}")
+
+        zone_stats.configure(state="normal")
+        zone_stats.delete("1.0", "end")
+        zone_stats .insert("1.0", "\n\n".join(lignes))
+        zone_stats.configure(state="disabled")
+
+
+
+
+    ttk.Button(parent_selec, text="rafraichir",
                command=lambda: rafraichir()).grid(row=2, column=1, pady=2)
+    
+    ttk.Button(parent_selec, text="statistiques",
+               command=lambda: stats()).grid(row=3, column=1, pady=2)
 
     rafraichir()
     return rafraichir
