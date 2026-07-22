@@ -199,8 +199,6 @@ if __name__ == "__main__":
    
 
     #-------------lancement pipeline-------------
-    # on lit les widgets de reglage (w_entiers, w_flottants... definis plus bas, avec
-    # tous les widgets crees) pour construire le dict passe a config.save
     def recolte():
         reglages = {nom: int(w.get())   for nom, w in {**w_entiers, **w_listes}.items()}
         reglages.update({nom: float(w.get()) for nom, w in w_flottants.items()})
