@@ -3,7 +3,7 @@ import requests
 import geopandas as gpd
 
 from src import config
-
+_session = requests.Session()
 
 def lireWFS(params):
     """
@@ -13,17 +13,18 @@ def lireWFS(params):
 
     @return GeoDataFrame du resultat (leve RuntimeError apres tous les echecs)
     """
-    n = config.N_ESSAIS_WFS
+    n, pause = config.N_ESSAIS_WFS, config.PAUSE_WFS
     err = ""
-    for _ in range(n):
+    for essai in range(1, n + 1):
         try:
-            txt = requests.get(config.WFS, params=params, timeout=120).text
+            txt = _session.get(config.WFS, params=params, timeout=120).text
             if "FeatureCollection" in txt[:300]:
                 return gpd.read_file(txt)
             err = txt[:200]
-        except requests.RequestException as e:
+        except Exception as e:
             err = str(e)
-        time.sleep(config.PAUSE_WFS)
+        if essai < n:
+            time.sleep(pause * essai)
     raise RuntimeError(f"WFS a echoue {n}x : {err}")
 
 
@@ -35,17 +36,18 @@ def compter(params):
 
     @return nombre d'entites (leve RuntimeError apres tous les echecs)
     """
-    n = config.N_ESSAIS_WFS
+    n, pause = config.N_ESSAIS_WFS, config.PAUSE_WFS
     err = ""
-    for _ in range(n):
+    for essai in range(1, n + 1):
         try:
-            r = requests.get(config.WFS, {**params, "COUNT": 1}, timeout=120)
+            r = _session.get(config.WFS, params={**params, "COUNT": 1}, timeout=120)
             j = r.json()
             if "numberMatched" in j:
                 return j["numberMatched"]
             err = r.text[:200]
         except Exception as e:
             err = str(e)
-        time.sleep(config.PAUSE_WFS)
+        if essai < n:
+            time.sleep(pause * essai)
     raise RuntimeError(f"WFS (comptage) a echoue {n}x : {err}")
 

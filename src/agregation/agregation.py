@@ -7,7 +7,7 @@ from src import config
 def agregerBatiment(df, gdf, hauteur):
     """
     Agrege les pixels par batiment, applique le modele PV, joint a la BD TOPO.
-    Production / puissance sur base "orientee" = plat + incline sud (pans nord exclus).
+    Production / puissance sur base "orientee" = plat + incline dans la fenetre d'azimut.
     Surfaces descriptives (surf_incl_m2, secteurs, pente_moy_incl) : toutes orientations.
     --------
     @param[in] df      : sortie de irrPixels (1 ligne par pixel)
@@ -19,16 +19,19 @@ def agregerBatiment(df, gdf, hauteur):
     pv = config.TAUX_COUVERTURE * config.RENDEMENT_MODULE * config.PERFORMANCE_RATIO  # conversion des kWh recus en kWh produits
 
     inc     = df[df.incline]                       # incline, toutes orientations
-    inc_or  = df[df.incline_or]                    # incline oriente sud
+    inc_or  = df[df.incline_or]                    # incline dans la fenetre d'azimut
     plat    = df[~df.incline]                      # plat
-    oriente = df[df.incline_or | ~df.incline]      # plat + sud (base de production)
+    oriente = df[df.incline_or | ~df.incline]      # plat + oriente (base de production)
+    seuil   = df[df.energie / df.surf >= config.SEUIL_IRRADIANCE]
 
     res = pd.DataFrame({
         "irr_an_kwh":          df.groupby("id").energie.sum(),         # toute la toiture
-        "irr_an_kwh_orp":      oriente.groupby("id").energie.sum(),    # plat + sud
+        "irr_an_kwh_orp":      oriente.groupby("id").energie.sum(),    # plat + oriente
+        "irr_seuil_kwh":       seuil.groupby("id").energie.sum(),
         "surf_incl_m2":        inc.groupby("id").surf.sum(),
         "surf_incl_or_m2":     inc_or.groupby("id").surf.sum(),
         "surf_plate_m2":       plat.groupby("id").surf.sum(),
+        "surf_seuil_m2":       seuil.groupby("id").surf.sum(),
         "pente_moy_incl":           inc.groupby("id").pente.mean(),
         "nb_pixels":           df.groupby("id").size(),
     })
@@ -42,17 +45,23 @@ def agregerBatiment(df, gdf, hauteur):
 
     res = res.fillna(0.0)                           # batiment sans pixel d'une categorie : 0 plutot que NaN
 
-    res["surf_tot_m2"]      = res.surf_incl_m2 + res.surf_plate_m2
-    res["puissance_kwc_orp"] = (res.surf_incl_or_m2 + res.surf_plate_m2) * config.TAUX_COUVERTURE * config.RENDEMENT_MODULE
-    res["prod_an_kwh"]      = res.irr_an_kwh         * pv       # toute la toiture
-    res["prod_an_kwh_orp"]   = res.irr_an_kwh_orp * pv          # plat + sud
+    kwc = config.TAUX_COUVERTURE * config.RENDEMENT_MODULE
+    res["surf_tot_m2"]         = res.surf_incl_m2 + res.surf_plate_m2
+    res["puissance_kwc"]       = res.surf_tot_m2 * kwc
+    res["puissance_kwc_orp"]   = (res.surf_incl_or_m2 + res.surf_plate_m2) * kwc
+    res["puissance_kwc_seuil"] = res.surf_seuil_m2 * kwc
+    res["prod_an_kwh"]         = res.irr_an_kwh    * pv
+    res["prod_an_kwh_orp"]     = res.irr_an_kwh_orp * pv
+    res["prod_seuil_kwh"]      = res.irr_seuil_kwh * pv
 
     out = gdf.join(res, how="inner")               # garde les batiments avec >= 1 pixel de toit
     ordre = (["cleabs", *config.ATTRS_BATI, "hauteur_pts",
               "nb_pixels", "surf_tot_m2", "surf_plate_m2",
-              "surf_incl_m2", "surf_incl_or_m2", "pente_moy_incl"]
+              "surf_incl_m2", "surf_incl_or_m2", "surf_seuil_m2", "pente_moy_incl"]
              + [f"surf_incl_{s}_m2" for s in config.SECTEURS]
-             + ["irr_an_kwh", "prod_an_kwh", "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp"]
+             + ["irr_an_kwh", "puissance_kwc", "prod_an_kwh",
+                "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp",
+                "irr_seuil_kwh", "puissance_kwc_seuil", "prod_seuil_kwh"]
              + [f"prod_T{t}_kwh_orp" for t in range(1, 5)]
              + ["geometry"])
     return out[ordre]
@@ -60,7 +69,7 @@ def agregerBatiment(df, gdf, hauteur):
 
 def mergeCleabs(gdf):
     """
-    Recolle les morceaux d'un meme batiment a cheval sur 2 dalles (meme cleabs) :
+    Recolle les morceaux d'un meme batiment a cheval sur plusieurs dalles (meme cleabs) :
     somme les grandeurs additives, moyenne ponderee de la pente, garde la hauteur max.
     --------
     @param[in] gdf : sortie de agregerBatiment (plusieurs lignes possibles par cleabs)

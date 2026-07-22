@@ -1,10 +1,13 @@
 import os
 import time
+import json
+from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import numba
 import pandas as pd
 import geopandas as gpd
+
 
 from src.tuile.raster import chargerDalle
 from src.tuile.donnees_dalle import nomCoord, centreWGS84, tileBounds
@@ -16,19 +19,16 @@ from src.agregation.agregation import agregerBatiment, mergeCleabs
 from src.agregation.select import filtrer, hBat
 from src.acquisition.telechargement import telechargerFichier, listeTelechargement
 from src.acquisition.batiments import batiments
-from src.acquisition.zone import zone
+from src.acquisition.zone import zone, listeDepartements
 from src.acquisition.dalles import dalles
-from src.debug import debug_pipeline as debug
 from src import config
 
-
-def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None, temps=None):
+def traiterDalle(mns_path, mnt_path, gdf, temps=None):
     """
     Traite une dalle : geometrie, masques, horizon, irradiance, agregation par batiment.
     --------
     @param[in] mns_path, mnt_path : chemins des rasters MNS / MNT IGN
     @param[in] gdf       : GeoDataFrame des batiments de la dalle (Lambert 93)
-    @param[in] debug_dir : si fourni, exporte les rasters intermediaires
     @param[in] temps     : dict optionnel rempli avec la duree de chaque etape
 
     @return out : GeoDataFrame, 1 ligne par batiment
@@ -70,17 +70,6 @@ def traiterDalle(mns_path, mnt_path, gdf, debug_dir=None, temps=None):
 
 
 
-
-    # export debug optionnel
-    if debug_dir is not None:
-        debug.exportRasters({
-            "pente": pente, "aspect": aspect, "mnh": mnh,
-            "incline":    incline.astype("int32"),
-            "incline_or": incline_or.astype("int32"),
-            "plat":       plat.astype("int32"),
-        }, meta, debug_dir)
-        debug.exportHorizon(horizon, toiture, meta, os.path.join(debug_dir, "horizon"))
-
     return out
 
 
@@ -93,7 +82,8 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     @param[in] on_log      : callback (message) pour les messages (defaut print)
 
     @return bilan : dict (fichier, total, echecs, moyennes_dalle, temps_globaux, batiments) ;
-                    None si zone introuvable ou aucun batiment
+                    None si zone introuvable ou aucun batiment ; bilan reduit
+                    (fichier None) si aucune dalle n'aboutit
     """
     t_total = time.time()
     t0 = time.time()
@@ -101,7 +91,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     if polygone is None:
         on_log("zone introuvable"); return None
 
-    gdf_bati = batiments(polygone)
+    gdf_bati = batiments(polygone, on_log=on_log)
     if gdf_bati is None or gdf_bati.empty:
         on_log("aucun batiment"); return None
     t_bati = time.time() - t0
@@ -157,9 +147,13 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
             + ["geometry"])
     g = g[[c for c in cols if c in g.columns]] 
     
-    if os.path.exists(gpkg_path):
-        os.remove(gpkg_path)
-    g.to_file(gpkg_path, driver="GPKG", layer="batiments")
+    metadonnees = {
+        "parametres":    json.dumps(config.snapshot(), ensure_ascii=False),
+        "zone":          json.dumps({"echelle": echelle, "nom_zone": nom_zone, "code_dep": code_dep}, ensure_ascii=False),
+        "batiments":     json.dumps({"avant_merge_filtre": n_avant, "apres_merge": n_merge, "final": n_filtre}, ensure_ascii=False),
+        "date_creation": datetime.now().isoformat(timespec="seconds"),
+    }
+    g.to_file(gpkg_path, driver="GPKG", layer="batiments", dataset_metadata=metadonnees)
     t_ecriture = time.time() - t0
 
     def moyenne(cle):
@@ -224,3 +218,83 @@ def traiterTache(tache):
             if pth and os.path.exists(pth):
                 os.remove(pth)
 
+
+
+
+# fonction a supprimer si l'echelle region/nationale se calcule un jour en un seul run
+def runPipelineDecoupe(echelle, nom_zone, on_progress=None, on_log=print):
+    """
+    Calcule une region ou la France entiere departement par departement, en
+    reutilisant runPipeline("departement", ...) sans le modifier. Un departement
+    qui echoue n'arrete pas les suivants ; au lancement suivant, les departements
+    deja calcules (gpkg present) sont sautes et les manquants refaits.
+    --------
+    @param[in] echelle  : 'region' ou 'nationale'
+    @param[in] nom_zone : nom de la region (ignore si echelle == 'nationale')
+    @param[in] on_progress, on_log : memes callbacks que runPipeline
+
+    @return bilan agrege (memes cles que runPipeline) ; None si zone introuvable
+    """
+    noms = listeDepartements(echelle, nom_zone)
+    if not noms:
+        on_log("zone introuvable"); return None
+
+    t_total = time.time()
+    total_dalles, n_avant, n_merge, n_filtre = 0, 0, 0, 0
+    t_bati_tot, t_traitement_tot, t_ecriture_tot = 0.0, 0.0, 0.0
+    echecs, fichiers, deja_faits = [], [], []
+
+    for i, nom in enumerate(noms, 1):
+        nom_fichier = nom.replace(" ", "_").replace(",", "")
+        gpkg_path = os.path.join(config.OUT_DIR_PROCESSED, f"{nom_fichier}.gpkg")
+        if os.path.exists(gpkg_path):
+            on_log(f"=== departement {nom} ({i}/{len(noms)}) : deja fait, ignore ===")
+            deja_faits.append(nom)   
+            continue
+
+        on_log(f"=== departement {nom} ({i}/{len(noms)}) ===")
+        bilan, erreur = None, None
+        for essai in range(1, config.N_ESSAIS_DEPARTEMENT + 1):
+            try:
+                bilan = runPipeline("departement", nom, None, on_progress=on_progress, on_log=on_log)
+                erreur = None
+                break
+            except Exception as e:
+                erreur = str(e)
+                on_log(f"[ERREUR] departement {nom}, essai {essai}/{config.N_ESSAIS_DEPARTEMENT} : {e}")
+                if essai < config.N_ESSAIS_DEPARTEMENT:
+                    time.sleep(config.PAUSE_DEPARTEMENT)
+
+        if erreur is not None:
+            echecs.append({"nom": nom, "erreur": erreur})
+            continue
+        if bilan is None:
+            on_log(f"departement {nom} : zone introuvable ou aucun batiment")
+            continue
+
+        total_dalles += bilan.get("total", 0)
+        echecs += bilan.get("echecs", [])
+        bat = bilan.get("batiments", {})
+        n_avant  += bat.get("avant_merge_filtre", 0)
+        n_merge  += bat.get("apres_merge", 0)
+        n_filtre += bat.get("final", 0)
+        glob = bilan.get("temps_globaux", {})
+        t_bati_tot       += glob.get("batiments", 0.0)
+        t_traitement_tot += glob.get("traitement", 0.0)
+        t_ecriture_tot   += glob.get("ecriture", 0.0)
+        moy = bilan.get("moyennes_dalle", {})
+        if moy:
+            on_log("   temps moyen/dalle (s) : " + ", ".join(f"{k}={v:.2f}" for k, v in moy.items()))
+        if bilan.get("fichier"):
+            fichiers.append(bilan["fichier"])
+
+    return {
+        "fichier": f"{len(fichiers)} fichier(s) calcules + {len(deja_faits)} deja fait(s), dans {config.OUT_DIR_PROCESSED}",
+        "total": total_dalles,
+        "echecs": echecs,
+        "batiments": {"avant_merge_filtre": n_avant, "apres_merge": n_merge, "final": n_filtre},
+        "temps_globaux": {
+            "batiments": t_bati_tot, "traitement": t_traitement_tot,
+            "ecriture": t_ecriture_tot, "total": time.time() - t_total,
+        },
+    }

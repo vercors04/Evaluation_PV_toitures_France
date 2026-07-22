@@ -1,9 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('data/tables', 'data/tables'), ('a_propos.md', '.'), ('data/assets/logo_soleil.ico', 'executable')]
+datas = [('data/tables', 'data/tables'), ('data/contours', 'data/contours'),
+         ('a_propos.md', '.'), ('data/assets/logo_soleil.ico', 'data/assets')]
 binaries = []
-hiddenimports = []
+hiddenimports = ['webview.platforms.winforms', 'webview.platforms.edgechromium']
 tmp_ret = collect_all('pyproj')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('pyogrio')
@@ -21,6 +22,10 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('numba')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('llvmlite')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('folium')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('branca')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
@@ -47,7 +52,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='main',
+    name='roofTool',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -67,5 +72,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='main',
+    name='roofTool',
 )

@@ -38,9 +38,11 @@ GEOMETRIE
 METEO
 -----
 
+----------
+EXECUTABLE
+----------
 
-
-
+Pour lancer l'executable : pyinstaller main.spec
 
 
 

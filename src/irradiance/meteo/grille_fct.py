@@ -1,7 +1,6 @@
 import os
 
 import numpy as np
-import pvlib
 from src import config
 
 
@@ -14,9 +13,10 @@ def transpAgr(bhi, dhi, lat, lon):
     @param[in] bhi, dhi : Series (W/m2, plan horizontal) indexees par un DatetimeIndex UTC
     @param[in] lat, lon : centre de la cellule (deg WGS84)
 
-    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (W/m2)
+    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (ciel + reflechi sol), W/m2
     @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil (deg)
     """
+    import pvlib
     times = bhi.index
     ghi = (bhi + dhi).clip(lower=0)
 
@@ -71,6 +71,7 @@ def telecharger(lat, lon):
 
     @return df : DataFrame des series horaires PVGIS (composantes directe/diffuse, plan horizontal)
     """
+    import pvlib
     out = pvlib.iotools.get_pvgis_hourly(
         lat, lon, start=2005, end=2023,
         raddatabase="PVGIS-SARAH3",
@@ -103,7 +104,7 @@ def chargerTable(lat, lon):
     --------
     @param[in] lat, lon : coordonnees quelconques (deg WGS84)
 
-    @return B, D     : tableaux (n_alphas, n_betas, 12, 24) en W/m2
+    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (ciel + reflechi sol), W/m2
     @return SAZ, SEL : tableaux (12, 24), azimut et elevation du soleil (deg)
     """
     la = round(round(lat / config.PAS) * config.PAS, 2)

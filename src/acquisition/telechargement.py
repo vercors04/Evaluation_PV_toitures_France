@@ -1,7 +1,7 @@
 import os, time, requests
 
 from src import config
-
+_session = requests.Session()
 
 def telechargerFichier(url, nom_fichier, dossier_dest):
     """
@@ -19,7 +19,7 @@ def telechargerFichier(url, nom_fichier, dossier_dest):
 
     for essai in range(1, n_essais + 1):
         try:
-            r = requests.get(url, stream=True, timeout=120)
+            r = _session.get(url, stream=True, timeout=120)
             r.raise_for_status()
             with open(chemin, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
@@ -40,7 +40,8 @@ def listeTelechargement(dictionnaire_resultats):
     --------
     @param[in] dictionnaire_resultats : dict {'MNT': GeoDataFrame, 'MNS': GeoDataFrame} (colonnes name, url)
 
-    @return liste de tuples (nom_mnt, url_mnt, nom_mns, url_mns) ; [] si MNT ou MNS manquant
+    @return liste de tuples (nom_mnt, url_mnt, nom_mns, url_mns) ; [] si MNT ou MNS manquant ;
+            une dalle sans equivalent dans l'autre couche est ignoree
     """
 
     if 'MNT' not in dictionnaire_resultats or 'MNS' not in dictionnaire_resultats:

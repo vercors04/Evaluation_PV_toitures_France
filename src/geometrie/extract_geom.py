@@ -1,8 +1,70 @@
+import math
+
 import numpy as np
+from numba import njit, prange
 from rasterio.features import rasterize
-from scipy.ndimage import binary_erosion
 
 from src import config
+
+
+@njit(parallel=True, cache=True)
+def gradMasque(mns, pts_ok, masque_bat, res):
+    """
+    Pente et aspect du MNS par differences finies, decentrees au bord et limitees
+    aux voisins du meme batiment (masque_bat == k). Remplace l'erosion (numba).
+    --------
+    @param[in] mns        : 2D float de la dalle (NaN hors donnees)
+    @param[in] pts_ok     : 2D bool, pixels de toit valides
+    @param[in] masque_bat : 2D int, index gdf + 1 du batiment (0 = fond)
+    @param[in] res        : taille du pixel (m)
+
+    @return pente, aspect : 2D float (deg), NaN hors toit ; aspect boussole (0=N, 90=E)
+    """
+    H, W = mns.shape
+    pente  = np.full((H, W), np.nan)
+    aspect = np.full((H, W), np.nan)
+    r2 = 2.0 * res
+    for i in prange(H):
+        for j in range(W):
+            if not pts_ok[i, j]:
+                continue
+            k = masque_bat[i, j]
+            z0 = mns[i, j]
+
+            # dz/dcol : voisins est/ouest du meme batiment
+            e = w_ = False
+            if j + 1 < W:
+                e = pts_ok[i, j + 1] and masque_bat[i, j + 1] == k
+            if j - 1 >= 0:
+                w_ = pts_ok[i, j - 1] and masque_bat[i, j - 1] == k
+            if e and w_:
+                dz_dc = (mns[i, j + 1] - mns[i, j - 1]) / r2
+            elif e:
+                dz_dc = (mns[i, j + 1] - z0) / res
+            elif w_:
+                dz_dc = (z0 - mns[i, j - 1]) / res
+            else:
+                continue
+
+            # dz/dligne : voisins sud/nord du meme batiment
+            s = n = False
+            if i + 1 < H:
+                s = pts_ok[i + 1, j] and masque_bat[i + 1, j] == k
+            if i - 1 >= 0:
+                n = pts_ok[i - 1, j] and masque_bat[i - 1, j] == k
+            if s and n:
+                dz_dl = (mns[i + 1, j] - mns[i - 1, j]) / r2
+            elif s:
+                dz_dl = (mns[i + 1, j] - z0) / res
+            elif n:
+                dz_dl = (z0 - mns[i - 1, j]) / res
+            else:
+                continue
+
+            pente[i, j]  = math.degrees(math.atan(math.hypot(dz_dc, dz_dl)))
+            aspect[i, j] = math.degrees(math.atan2(-dz_dc, dz_dl)) % 360.0
+
+    return pente, aspect
 
 
 def extractGeom(mns, mnt, gdf, meta):
@@ -14,7 +76,8 @@ def extractGeom(mns, mnt, gdf, meta):
     @param[in] gdf      : GeoDataFrame BD TOPO filtre (index 0..n-1)
     @param[in] meta     : profil rasterio (cles "transform" et "resolution")
 
-    @return pente, aspect : 2D float (deg), NaN hors pixels de toit valides
+    @return pente, aspect : 2D float (deg), NaN hors pixels de toit valides ;
+                            aspect en convention boussole (0=N, 90=E)
     @return masque_bat    : 2D int, index gdf + 1 du batiment (0 hors toit valide)
     @return mnh           : 2D float, hauteur au-dessus du sol (m)
     """
@@ -26,16 +89,10 @@ def extractGeom(mns, mnt, gdf, meta):
 
     pts_ok = (masque_bat > 0) & (mnh >= config.MNH_MIN) & np.isfinite(mns) & np.isfinite(mnt)
 
-    dz_dligne, dz_dcol = np.gradient(mns, meta["resolution"])
-    pente  = np.degrees(np.arctan(np.hypot(dz_dcol, dz_dligne)))
-    aspect = np.degrees(np.arctan2(-dz_dcol, dz_dligne)) % 360
+    # pente/aspect : gradient decentre par batiment (remplace np.gradient + erosion)
+    pente, aspect = gradMasque(mns, pts_ok, masque_bat, meta["resolution"])
 
-    # erosion : retire les bords de toit
-    valid = binary_erosion(pts_ok, np.ones((3, 3), dtype=bool))
-
-    masque_bat = np.where(valid, masque_bat, 0).astype("int32")   
-    pente[~valid]  = np.nan
-    aspect[~valid] = np.nan
+    masque_bat = np.where(np.isfinite(pente), masque_bat, 0).astype("int32")
     return pente, aspect, masque_bat, mnh
 
 

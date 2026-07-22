@@ -25,6 +25,7 @@ def compHZ(mns, masque_toiture, res, n_directions, max_distance_m, cap):
     tan_cap = np.tan(np.radians(cap))
 
 
+    # altitude max de la dalle, pour couper les rayons devenus sans effet
     zmax = -1e30
     for i in range(H):
         for j in range(W):
@@ -37,12 +38,13 @@ def compHZ(mns, masque_toiture, res, n_directions, max_distance_m, cap):
     while k <= max_dist_px:
         ks[m] = k
         m += 1
-        k += 1 + k // 10                
+        k += 1 + k // 10             # pas adaptatif, environ 10 % de la distance courante                
     ks = ks[:m]
     dist_m = ks * res
 
 
 
+    # decalages (ligne, colonne) precalcules pour chaque direction et chaque pas
     off_l = np.empty((n_directions, m), np.int64)
     off_c = np.empty((n_directions, m), np.int64)
     for d in range(n_directions):
@@ -74,9 +76,9 @@ def compHZ(mns, masque_toiture, res, n_directions, max_distance_m, cap):
                     t = (v - z0) / dist_m[s]
                     if t > tan_max:
                         tan_max = t
-                        if tan_max > tan_cap:             
+                        if tan_max > tan_cap:         # plafond solaire atteint             
                             break
-                if zmax - z0 <= tan_max * dist_m[s]:     
+                if zmax - z0 <= tan_max * dist_m[s]:  # plus aucun point ne peut battre tan_max     
                     break
             horizon[p, d] = np.degrees(np.arctan(tan_max))
     return horizon

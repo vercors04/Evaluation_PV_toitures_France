@@ -32,14 +32,16 @@ def grilleCellules(polygone):
 
 def construireCellule(lat, lon):
     """
-    Construit et sauvegarde la table d'une cellule
+    Construit et sauvegarde la table d'une cellule (npz compresse, B et D en float16).
     --------
     @param[in] lat, lon : centre de la cellule, en degres WGS84
+
+    @return None : ecrit le fichier renvoye par cheminTable(lat, lon)
     """
     df = telecharger(lat, lon)
     B, D, SAZ, SEL = transpAgr(df["poa_direct"], df["poa_sky_diffuse"], lat, lon)
     chemin = cheminTable(lat, lon)
-    os.makedirs(os.path.dirname(chemin), exist_ok=True)          # cree le sous-dossier de la cellule
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
     np.savez_compressed(chemin, B=B.astype(np.float16), D=D.astype(np.float16),
                         SAZ=SAZ, SEL=SEL,
                         alphas=config.ALPHAS, betas=config.BETAS, lat=lat, lon=lon,

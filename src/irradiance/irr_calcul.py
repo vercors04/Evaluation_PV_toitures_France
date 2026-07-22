@@ -13,7 +13,7 @@ def energiePix(a, p, B, D_h, horizon, dmh, SEL, NJ, pas_a, pas_b):
     @param[in] B        : table directe (n_alphas, n_betas, 12, 24), W/m2
     @param[in] D_h      : table diffuse pre-sommee sur l'heure (n_alphas, n_betas, 12), W/m2
     @param[in] horizon  : angle d'horizon par pixel et direction (N, n_dir), deg
-    @param[in] dmh      : direction du soleil par (mois, heure), shape (12, 24)
+    @param[in] dmh      : indice de direction d'horizon du soleil par (mois, heure), shape (12, 24)
     @param[in] SEL      : elevation du soleil par (mois, heure), shape (12, 24), deg
     @param[in] NJ       : nombre de jours par mois, shape (12,)
     @param[in] pas_a, pas_b : pas de la grille en orientation et pente (deg)
@@ -77,7 +77,7 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat,
     pas_a = float(config.ALPHAS[1] - config.ALPHAS[0])   # 15
     pas_b = float(config.BETAS[1] - config.BETAS[0])     # 10
     ndir  = horizon.shape[1]
-    dmh = (np.round(SAZ / (360 / ndir)).astype(np.int64) % ndir)   # (12,24) direction du soleil
+    dmh = (np.round(SAZ / (360 / ndir)).astype(np.int64) % ndir)   # (12,24) indice de direction du soleil
     D_h = D.sum(axis=3).astype(np.float32)                          # diffus pre-somme sur l'heure
 
     e_mois = energiePix(a, p, B.astype(np.float32), D_h, horizon.astype(np.float32),
