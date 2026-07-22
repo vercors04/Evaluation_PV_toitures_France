@@ -228,8 +228,6 @@ def menuCoches(parent, libelle, options, defaut, aide = None):
         n = sum(v.get() for v in variables.values())
         btn.configure(text=f"{n} sélectionné(s)  ▾")
 
-    # le compteur se remet a jour a tout changement, y compris depuis l'exterieur
-    # (ex: bouton "Reinitialiser les parametres"), pas seulement au clic d'une case
     for v in variables.values():
         v.trace_add("write", lambda *_: majTexte())
 
@@ -247,7 +245,7 @@ def menuCoches(parent, libelle, options, defaut, aide = None):
         ncols   = math.ceil(len(opts) / 5)             
         par_col = math.ceil(len(opts) / ncols)        
         for idx, (opt, v) in enumerate(opts):
-            ttk.Checkbutton(pop, text=opt, variable=v).grid(   # maj du compteur via le trace ci-dessus
+            ttk.Checkbutton(pop, text=opt, variable=v).grid(
                 row=idx % par_col, column=idx // par_col, sticky="w", padx=10, pady=2)
 
         ttk.Button(pop, text="OK", command=pop.destroy).grid(

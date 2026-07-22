@@ -366,26 +366,23 @@ if __name__ == "__main__":
     albedo = champ2(bpa, "Albédo (réflectivité du sol)", config.ALBEDO)
 
 
-    # source unique reglage <-> widget des 2 onglets, groupee par type de widget.
-    # Lue par recolte() et reecrite par reinitialiser() ; comme ces fonctions ne sont
-    # appelees qu'au clic, ces dicts existent toujours a ce moment-la.
-    w_entiers = {          # Entry, valeur entiere
+    w_entiers = {
         "SURF_MIN": surf_min, "HAUT_MIN": haut_min, "HAUT_MAX": haut_max,
         "AZ_MIN": az_min, "AZ_MAX": az_max, "PENTE_PLAT": pente_plat, "PENTE_MAX": pente_max,
         "N_ESSAIS_WFS": n_essais_wfs, "N_COEURS": n_coeurs, "N_THREADS": n_threads,
         "COUNT": count, "N_ESSAIS": n_essais, "DIST_MAX_M": dist_max_m,
         "N_ESSAIS_DEPARTEMENT": n_essais_dep,
     }
-    w_flottants = {        # Entry, valeur decimale
+    w_flottants = {
         "BUFFER": buffer, "MNH_MIN": mnh_min, "CAP": cap, "PAUSE_WFS": pause_wfs, "PAUSE_DL": pause_dl,
         "RENDEMENT_MODULE": rendement_module, "PERFORMANCE_RATIO": performance_ratio,
         "TAUX_COUVERTURE": taux_couverture, "ALBEDO": albedo, "PAUSE_DEPARTEMENT": pause_dep,
         "SEUIL_IRRADIANCE": seuil_irradiance,
     }
-    w_listes = {"N_DIRECTIONS": n_directions}            # Combobox (lecture .get(), ecriture .set())
-    w_cases  = {"CONSTRUCTION_LEGERE": const_leg}         # Checkbutton
+    w_listes = {"N_DIRECTIONS": n_directions}
+    w_cases  = {"CONSTRUCTION_LEGERE": const_leg}
     w_menus  = {"ATTRS_BATI": attrs, "NATURE_OK": nature, "USAGE_OK": usage_1,
-                "SORTIE_GARDEES": sortie, "ETAT": etat}   # menuCoches
+                "SORTIE_GARDEES": sortie, "ETAT": etat}
 
     def reinitialiser():
         for nom, w in {**w_entiers, **w_flottants}.items():
