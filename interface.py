@@ -49,13 +49,13 @@ if __name__ == "__main__":
                                 config.ATTRS_BDTOPO,
                                 ["nature", "usage_1", "nombre_d_etages"], aide="attributs de la BD TOPO. Les colonnes sont souvent partiellement vide et/ou avec des données éronées. Il est conseillé de ne pas inclure les colonnes 'hauteur' et 'nombre_d_etages' dans le filtrage des toits, mais de les utiliser uniquement pour l'analyse des toits retenus.")
 
-    etat = menuCoches(bpg, "Etat", config.ETATS, ["En service"])
+    etat = menuCoches(bpg, "Etat", config.ETATS, config.ETAT)
     nature = menuCoches(bpg, "Natures gardees", config.NATURES,
-                                ['Indifférenciée', 'Industriel, agricole ou commercial'])
+                               config.NATURE_OK)
     usage_1 = menuCoches(bpg, "Usages gardees", config.USAGE_1,
-                                ['Résidentiel', 'Commercial et services', 'Indifférencié', 'Industriel', 'Agricole'], aide = "beaucoup de batiments sont notés comme indifférenciés, bien qu'ils puissent être d'un usage particulier.")
+                                config.USAGE_OK, aide = "beaucoup de batiments sont notés comme indifférenciés, bien qu'ils puissent être d'un usage particulier.")
 
-    sortie = menuCoches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), list(config.GROUPES_SORTIE), aide="colonnes gardées. Dans tout les cas les valeurs sont calculées, certaines peuvent être juste supprimées de la sortie finale.")
+    sortie = menuCoches(bpg, "Colonnes de sortie", list(config.GROUPES_SORTIE), config.SORTIE_GARDEES, aide="colonnes gardées. Dans tout les cas les valeurs sont calculées, certaines peuvent être juste supprimées de la sortie finale.")
 
 
     #-------------choix zone-------------
