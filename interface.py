@@ -318,7 +318,7 @@ if __name__ == "__main__":
                     for ligne in afficherBilan(item[1]):
                         ecrireLog(ligne + "\n")
                     rafraichirPA()
-                    rafraichirSR()
+                    rafraichirIF()
 
                 elif item[0] == "error":
                     btn_lancer.configure(state="normal")
@@ -492,7 +492,7 @@ if __name__ == "__main__":
 
 
     
-    rafraichirSR = statsRapide (bad, config.OUT_DIR_PROCESSED, bas)
+    rafraichirIF = statsRapide (bad, config.OUT_DIR_PROCESSED, bas)
 
 
     #======onglet 5======

@@ -1,4 +1,5 @@
 import json, os, sys
+os.environ["GDAL_PAM_ENABLED"] = "NO"
 import numpy as np
 
 if getattr(sys, "frozen", False):
