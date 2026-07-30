@@ -402,7 +402,7 @@ if __name__ == "__main__":
             messagebox.showerror("Paramètres", f"Valeur invalide dans un champ : {e}")
             return
         config.save(reglages)
-        messagebox.showinfo("Paramètres", "Paramètres enregistrés dans settings.json.")
+        messagebox.showinfo("Paramètres", "Paramètres enregistrés")
 
     ligne_btns = ttk.Frame(bpa); ligne_btns.pack(pady=8)
     ttk.Button(ligne_btns, text="Réinitialiser les paramètres par défaut",

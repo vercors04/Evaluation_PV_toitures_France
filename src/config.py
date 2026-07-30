@@ -9,7 +9,7 @@ else:
     BASE      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     BASE_DATA = BASE
 
-SETTINGS = os.path.join(BASE, "settings.json")       # reglages persistes, sous BASE
+SETTINGS = os.path.join(BASE, "executable", "settings.json")    
 
 
 # ============================================================
