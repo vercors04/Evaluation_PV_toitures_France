@@ -166,6 +166,7 @@ def save(reglages):
 
     @return None : settings.json est mis a jour et les variables du module rechargees
     """
+    os.makedirs(os.path.dirname(SETTINGS), exist_ok=True)
     actuel = {}
     if os.path.exists(SETTINGS):
         with open(SETTINGS, encoding="utf-8") as f:
