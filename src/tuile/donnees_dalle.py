@@ -1,6 +1,19 @@
-from pyproj import Transformer
+from pyproj import CRS, Transformer
 
-_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)   # Lambert 93 vers WGS84
+_TR_L93_WGS84 = Transformer.from_crs(2154, 4326, always_xy=True)
+METROPOLE = CRS.from_epsg(2154).area_of_use.bounds
+
+
+def enMetropole(lat, lon):
+    """
+    Indique si un point tombe dans le domaine du Lambert 93.
+    --------
+    @param[in] lat, lon : point (deg WGS84)
+
+    @return True dans le domaine
+    """
+    ouest, sud, est, nord = METROPOLE
+    return ouest <= lon <= est and sud <= lat <= nord
 
 
 def nomCoord(mns_name):
@@ -23,7 +36,7 @@ def centreWGS84(x_km, y_km):
 
     @return lat, lon : centre de la tuile (deg WGS84)
     """
-    xc, yc = x_km * 1000 + 500, y_km * 1000 - 500       # -500 : le nom IGN donne le coin NORD-ouest
+    xc, yc = x_km * 1000 + 500, y_km * 1000 - 500
     lon, lat = _TR_L93_WGS84.transform(xc, yc)
     return lat, lon
 

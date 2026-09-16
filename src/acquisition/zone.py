@@ -1,38 +1,59 @@
-import requests
-from shapely.geometry import box, Point
+import os
 
-from src.acquisition.requetes import lireWFS
+import geopandas as gpd
+from shapely.geometry import Point
+
+from src.acquisition.requetes import lireWFS, session
+from src.tuile.donnees_dalle import enMetropole
+from src import config
+
+
+def metropole(gdf):
+    """
+    Entites dont le point interieur tombe dans le domaine du Lambert 93.
+    --------
+    @param[in] gdf : GeoDataFrame WGS84
+
+    @return GeoDataFrame filtre
+    """
+    if gdf.empty:
+        return gdf
+    return gdf[[enMetropole(p.y, p.x) for p in gdf.geometry.representative_point()]]
+
 
 def zone(echelle, nom_zone, code_dep=None):
     """
-    Resout l'emprise de la zone d'etude en un polygone WGS84.
+    Emprise de la zone d'etude.
     --------
-    @param[in] echelle  : 'adresse', 'commune', 'departement', 'region' ou 'nationale'
-    @param[in] nom_zone : adresse complete, ou nom du territoire
-    @param[in] code_dep : code departement (seulement pour 'commune', pour lever les homonymes)
+    @param[in] echelle  : 'adresse', 'commune', 'departement', 'region', 'nationale' ou
+                          'polygone' (zone tracee)
+    @param[in] nom_zone : adresse, nom du territoire ou nom de la zone tracee
+    @param[in] code_dep : code departement, pour 'commune'
 
-    @return polygone : geometrie shapely en WGS84 (cercle d'environ 40 m autour du point
-                       geocode pour une adresse, contour du territoire sinon) ; None si introuvable
+    @return polygone shapely WGS84 (cercle d'environ 40 m pour une adresse, metropole seule
+            pour 'nationale') ; None si introuvable
     """
+    if echelle == "polygone":
+        chemin = os.path.join(config.DIR_GEOJSON, f"{nom_zone}.geojson")
+        if not os.path.exists(chemin):
+            return None
+        gdf = gpd.read_file(chemin).to_crs(4326)
+        return None if gdf.empty else gdf.geometry.iloc[0]
+
     if echelle == "nationale":
         params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature",
                   "TYPENAME": "BDTOPO_V3:region", "OUTPUTFORMAT": "application/json",
                   "COUNT": 100}
-        gdf = lireWFS(params)
-        if gdf.empty:
-            return None
-        france = gdf.geometry.union_all()                       # (unary_union si vieille version)
-        return france    # .intersection(box(-5.5, 41.0, 10.0, 51.5)) pour exclure l'outre-mer
-    
+        gdf = metropole(lireWFS(params))
+        return None if gdf.empty else gdf.geometry.union_all()
 
     if echelle == "adresse":
-        feats = requests.get("https://data.geopf.fr/geocodage/search",
-                             params={"q": nom_zone, "limit": 1}).json()["features"]
+        feats = session().get(config.GEOCODAGE, params={"q": nom_zone, "limit": 1},
+                              timeout=60).json()["features"]
         if not feats:
             return None
         lon, lat = feats[0]["geometry"]["coordinates"]
-        return Point(lon, lat).buffer(0.0004)   # ~40 m
-
+        return Point(lon, lat).buffer(0.0004)
 
     nom_zone = nom_zone.replace("'", "''")
     cql = {
@@ -41,31 +62,26 @@ def zone(echelle, nom_zone, code_dep=None):
         "region":      f"nom_officiel ILIKE '{nom_zone}'",
     }[echelle]
 
-    params = {"SERVICE":"WFS","VERSION":"2.0.0","REQUEST":"GetFeature",
-              "TYPENAME": f"BDTOPO_V3:{echelle}", "OUTPUTFORMAT":"application/json", "CQL_FILTER": cql}
-    
+    params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature",
+              "TYPENAME": f"BDTOPO_V3:{echelle}", "OUTPUTFORMAT": "application/json",
+              "CQL_FILTER": cql}
     gdf = lireWFS(params)
-
     return None if gdf.empty else gdf.geometry.iloc[0]
 
 
-
-
-# fonction a supprimer si l'echelle region/nationale se calcule un jour en un seul run
 def listeDepartements(echelle, nom_zone):
     """
-    Noms officiels des departements composant une region ou la France entiere (DOM inclus).
+    Departements metropolitains d'une region ou de la France.
     --------
     @param[in] echelle  : 'region' ou 'nationale'
-    @param[in] nom_zone : nom de la region (ignore si echelle == 'nationale')
+    @param[in] nom_zone : nom de la region (ignore pour 'nationale')
 
-    @return liste des noms officiels de departement (str) ; [] si region introuvable
+    @return liste triee des noms officiels ; [] si region introuvable
     """
     params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature",
               "TYPENAME": "BDTOPO_V3:departement", "OUTPUTFORMAT": "application/json",
               "COUNT": 200}
-    gdf = lireWFS(params)
-
+    gdf = metropole(lireWFS(params))
     if echelle == "nationale":
         return sorted(gdf["nom_officiel"].tolist())
 

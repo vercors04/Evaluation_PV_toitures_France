@@ -2,19 +2,19 @@ import pandas as pd
 from src import config
 
 
-def hBat(mnh, masque_bat, q=0.95):
+def hBat(mnh, masque_haut, q=0.95):
     """
-    Hauteur par batiment : quantile q du MNH sur l'emprise (m).
+    Hauteur par batiment : quantile q du MNH sur ses pixels.
     --------
-    @param[in] mnh        : 2D float, hauteur au-dessus du sol (m)
-    @param[in] masque_bat : 2D int, index gdf + 1 du batiment (0 hors batiment)
-    @param[in] q          : quantile (0.95 = p95, robuste aux cheminees et au bruit)
+    @param[in] mnh         : 2D float, hauteur au-dessus du sol (m)
+    @param[in] masque_haut : 2D int, index gdf + 1 (0 hors batiment), avant critere de pente
+    @param[in] q           : quantile (0.95 = p95)
 
-    @return Series indexee par id (= index gdf) : hauteur du batiment (m)
+    @return Series indexee par id (= index gdf) : hauteur (m)
     """
-    ok = masque_bat > 0
-    h = pd.DataFrame({"id": masque_bat[ok] - 1, "mnh": mnh[ok]})
-    return h.groupby("id").mnh.quantile(q)       
+    ok = masque_haut > 0
+    h = pd.DataFrame({"id": masque_haut[ok] - 1, "mnh": mnh[ok]})
+    return h.groupby("id").mnh.quantile(q)
 
 
 def filtrer(gdf):
@@ -26,7 +26,6 @@ def filtrer(gdf):
 
     @return GeoDataFrame filtre
     """
-    return gdf[(gdf.surf_tot_m2 >= config.SURF_MIN)
-               & (gdf.hauteur_pts >= config.HAUT_MIN)
-               & (gdf.hauteur_pts <= config.HAUT_MAX)].copy()
-
+    return gdf[(gdf.surf_m2 >= config.SURF_MIN)
+               & (gdf.hauteur_p95_m >= config.HAUT_MIN)
+               & (gdf.hauteur_p95_m <= config.HAUT_MAX)].copy()

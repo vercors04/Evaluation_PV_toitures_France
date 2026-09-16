@@ -1,34 +1,26 @@
-import pandas as pd
-
-from src.acquisition.requetes import lireWFS
+from src.acquisition.requetes import paginer
 from src import config
 
-def dalles(polygone):
+
+def dalles(polygone, on_log=print):
     """
-    Dalles LiDAR HD (MNT et MNS) intersectant la zone, via le WFS IGN (pagine).
+    Dalles LiDAR HD intersectant la zone (couche de metadonnees WFS, URL GetMap WMS).
     --------
     @param[in] polygone : emprise de la zone (shapely, WGS84)
+    @param[in] on_log   : callback (message) pour les avertissements (defaut print)
 
-    @return res : dict {'MNT': GeoDataFrame, 'MNS': GeoDataFrame} des dalles
-                  (colonnes name, url, geometry, ...) ; cle absente si aucune dalle
+    @return GeoDataFrame des dalles (url_mns, url_mnt, coordonnees_nw, geometry) ; vide si la
+            zone n'est pas couverte
     """
     minx, miny, maxx, maxy = polygone.bounds
-    res = {}
-    for couche in ("MNT", "MNS"):
-        morceaux, start = [], 0
-        while True:
-            params = {"SERVICE":"WFS","VERSION":"2.0.0","REQUEST":"GetFeature",
-                      "TYPENAME": f"IGNF_{couche}-LIDAR-HD:dalle", "OUTPUTFORMAT":"application/json",
-                      "CQL_FILTER": f"BBOX(geom,{miny},{minx},{maxy},{maxx})",
-                      "COUNT": config.COUNT, "STARTINDEX": start}
-            g = lireWFS(params)
-            if g.empty:
-                break
-            morceaux.append(g)
-            if len(g) < config.COUNT:
-                break
-            start += config.COUNT
-        if morceaux:
-            tout = pd.concat(morceaux, ignore_index=True)
-            res[couche] = tout[tout.intersects(polygone)].drop_duplicates("name")
-    return res
+    params = {"SERVICE": "WFS", "VERSION": "2.0.0", "REQUEST": "GetFeature",
+              "TYPENAME": "IGNF_LIDAR-HD_METADONNEE:metadata",
+              "OUTPUTFORMAT": "application/json",
+              "CQL_FILTER": f"BBOX(geom,{miny},{minx},{maxy},{maxx})",
+              "SORTBY": "coordonnees_nw",
+              "COUNT": config.COUNT}
+
+    tout = paginer(params, "coordonnees_nw", on_log)
+    if tout.empty:
+        return tout
+    return tout[tout.intersects(polygone)]

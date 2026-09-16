@@ -1,27 +1,33 @@
 import os
+import time
 
 import numpy as np
+import pandas as pd
+import requests
+
 from src import config
 
 
+CLES_TEMP = ("m_b", "m_d", "m_bb", "m_bd", "m_dd", "t_pond", "v_pond", "v_var",
+             "f1_pond", "f2_pond")
 
 
 def transpAgr(bhi, dhi, lat, lon):
     """
-    Transpose chaque pas de temps (Perez) puis moyenne par (mois, heure).
+    Transpose chaque pas de temps (Perez), puis moyenne par (mois, heure).
     --------
-    @param[in] bhi, dhi : Series (W/m2, plan horizontal) indexees par un DatetimeIndex UTC
+    @param[in] bhi, dhi : Series (W/m2, plan horizontal), DatetimeIndex UTC
     @param[in] lat, lon : centre de la cellule (deg WGS84)
 
-    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (ciel + reflechi sol), W/m2
-    @return SAZ, SEL : tableaux (12, 24), azimut et elevation apparente moyens du soleil (deg)
+    @return B, D     : (n_alphas, n_betas, 12, 24), direct et diffus (ciel + sol), W/m2
+    @return SAZ, SEL : (12, 24), azimut et elevation apparente moyens du soleil (deg)
     """
     import pvlib
     times = bhi.index
     ghi = (bhi + dhi).clip(lower=0)
 
-    sp = pvlib.solarposition.get_solarposition(times, lat, lon)            # zenith, azimut, elevation par heure
-    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"]).fillna(0)  # reconstruction du DNI
+    sp = pvlib.solarposition.get_solarposition(times, lat, lon)
+    dni = pvlib.irradiance.dni(ghi, dhi, sp["apparent_zenith"]).fillna(0)
     dni_extra = pvlib.irradiance.get_extra_radiation(times)
     airmass = pvlib.atmosphere.get_relative_airmass(sp["apparent_zenith"])
     cles = [times.month, times.hour]
@@ -40,85 +46,240 @@ def transpAgr(bhi, dhi, lat, lon):
             B[i, j] = profMH(direct, cles)
             D[i, j] = profMH(diffus, cles)
 
-    # position moyenne du soleil par (mois, heure) ; moyenner l'azimut est sans risque :
-    # en France le soleil ne passe jamais par le nord (0/360) de jour
     SAZ = profMH(sp["azimuth"], cles)
     SEL = profMH(sp["apparent_elevation"], cles)
     return B, D, SAZ, SEL
 
 
-def profMH(serie, cles):
+def profMH(serie, cles, how="mean"):
     """
-    Moyenne par (mois, heure UTC), tableau (12, 24), bins absents a 0.
+    Reduction par (mois, heure UTC), tableau (12, 24), bins absents a 0.
     --------
     @param[in] serie : Series indexee par un DatetimeIndex UTC
     @param[in] cles  : liste de Series (ex: [times.month, times.hour]) pour grouper la serie
+    @param[in] how   : reduction appliquee a chaque groupe ("mean", "sum", "count")
 
-    @return out : tableau (12, 24) de la valeur moyenne par (mois, heure)
+    @return out : tableau (12, 24) de la valeur reduite par (mois, heure)
     """
-    g = serie.groupby(cles).mean()
+    g = getattr(serie.groupby(cles), how)()
     out = np.zeros((12, 24), np.float32)
     for (m, h), v in g.items():
         out[int(m) - 1, int(h)] = v
     return out
 
 
-def telecharger(lat, lon):
+def coefsPerez(bhi, dhi, lat, lon):
     """
-    Telecharge les series horaires PVGIS (SARAH-3, 2005-2023) au point demande.
+    Coefficients de Perez F1 (circumsolaire) et F2 (bande d'horizon), heure par heure, lus sur
+    un plan vertical.
     --------
-    @param[in] lat, lon : coordonnees du point (centre de la cellule), en degres WGS84
+    @param[in] bhi, dhi : Series horaires direct et diffus horizontaux (W/m2), index UTC
+    @param[in] lat, lon : centre de la cellule (deg WGS84)
 
-    @return df : DataFrame des series horaires PVGIS (composantes directe/diffuse, plan horizontal)
+    @return f1, f2 : Series horaires, meme index
     """
     import pvlib
-    out = pvlib.iotools.get_pvgis_hourly(
-        lat, lon, start=2005, end=2023,
-        raddatabase="PVGIS-SARAH3",
-        components=True, surface_tilt=0, surface_azimuth=0,
-        usehorizon=False,
-        url=config.URL, map_variables=True,
-        timeout=120)                     # defaut 30s 
-    df = out[0]
-    return df
+    idx = bhi.index
+    sp = pvlib.solarposition.get_solarposition(idx, lat, lon)
+    zen = sp["zenith"]
+    cosz = np.cos(np.radians(zen)).clip(lower=0.01)
+    c = pvlib.irradiance.perez(
+        90.0, 180.0, dhi, (bhi / cosz).clip(upper=1400.0),
+        pvlib.irradiance.get_extra_radiation(idx), zen, sp["azimuth"],
+        pvlib.atmosphere.get_relative_airmass(zen), return_components=True)
+    d = dhi.where(dhi > 0.0)
+    f1 = (1.0 - 2.0 * c["poa_isotropic"] / d).fillna(0.0).clip(0.0, 1.0)
+    f2 = (c["poa_horizon"] / d).fillna(0.0).clip(-1.0, 1.0)
+    return f1, f2
 
 
-def cheminTable(lat, lon):
+def profilsCellule(bhi, dhi, temp_air, wind_speed, lat, lon):
     """
-    Chemin du fichier table d'une cellule.
+    Profils (mois, heure) des heures reelles : moments d'ordre 2 de l'irradiance horizontale,
+    temperature et vent ponderes, coefficients de Perez.
     --------
-    @param[in] lat, lon : centre de cellule, multiples de PAS (degres WGS84)
+    @param[in] bhi, dhi   : Series horaires direct et diffus horizontaux (W/m2), index UTC
+    @param[in] temp_air   : Series horaire de temperature de l'air a 2 m (degC)
+    @param[in] wind_speed : Series horaire de vent a 10 m (m/s)
+    @param[in] lat, lon   : centre de la cellule (deg WGS84)
 
-    @return chemin du .npz (ex: data/tables/lat_46/table_46.55_0.35.npz)
+    @return dict des 10 profils (12, 24) float32, cles de CLES_TEMP
     """
-    sous = f"lat_{int(lat)}"                                                                 # sous-dossier par bande de latitude
-    return os.path.join(config.DOSSIER, sous, f"table_{lat + 0.0:.2f}_{lon + 0.0:.2f}.npz")  # + 0.0 : evite "-0.00"
+    ghi  = (bhi + dhi).clip(lower=0)
+    cles = [ghi.index.month, ghi.index.hour]
+
+    s_g  = profMH(ghi, cles, "sum")
+    avec = s_g > 0
+    den  = np.where(avec, s_g, 1.0)
+
+    s_gg  = profMH(ghi * ghi, cles, "sum")
+    avec2 = s_gg > 0
+    den2  = np.where(avec2, s_gg, 1.0)
+
+    v_pond = np.where(avec2, profMH(ghi*ghi*wind_speed, cles, "sum") / den2,
+                      profMH(wind_speed, cles))
+    v_car  = np.where(avec2, profMH(ghi*ghi*wind_speed*wind_speed, cles, "sum") / den2,
+                      v_pond * v_pond)
+
+    prof = {
+        "m_b":    profMH(bhi, cles),
+        "m_d":    profMH(dhi, cles),
+        "m_bb":   profMH(bhi * bhi, cles),
+        "m_bd":   profMH(bhi * dhi, cles),
+        "m_dd":   profMH(dhi * dhi, cles),
+        "t_pond": np.where(avec, profMH(ghi * temp_air, cles, "sum") / den,
+                           profMH(temp_air, cles)),
+        "v_pond": v_pond,
+        "v_var":  np.maximum(v_car - v_pond * v_pond, 0.0),
+    }
+
+    f1, f2 = coefsPerez(bhi, dhi, lat, lon)
+    s_d = profMH(dhi, cles, "sum")
+    den_d = np.where(s_d > 0, s_d, 1.0)
+    prof["f1_pond"] = np.where(s_d > 0, profMH(dhi * f1, cles, "sum") / den_d, 0.0)
+    prof["f2_pond"] = np.where(s_d > 0, profMH(dhi * f2, cles, "sum") / den_d, 0.0)
+    return {k: v.astype(np.float32) for k, v in prof.items()}
+
+
+def serieBrute(lat, lon):
+    """
+    Series horaires PVGIS (SARAH-3, 2005-2023) du plan horizontal, avec config.N_ESSAIS essais
+    a delai doublant.
+    --------
+    @param[in] lat, lon : point (deg WGS84)
+
+    @return bhi, dhi, temp_air, wind_speed : Series horaires, DatetimeIndex UTC ; leve la
+            derniere exception apres tous les echecs
+    """
+    params = {"lat": lat, "lon": lon, "startyear": 2005, "endyear": 2023,
+              "raddatabase": "PVGIS-SARAH3", "components": 1,
+              "angle": 0, "aspect": -180, "usehorizon": 0, "outputformat": "json"}
+    for essai in range(1, config.N_ESSAIS + 1):
+        try:
+            r = requests.get(config.URL + "seriescalc", timeout=300, params=params)
+            r.raise_for_status()
+            heures = r.json()["outputs"]["hourly"]
+            break
+        except (requests.RequestException, ValueError, KeyError):
+            if essai == config.N_ESSAIS:
+                raise
+            time.sleep(min(config.PAUSE_DL * 2 ** (essai - 1), 300))
+    index = pd.to_datetime([e["time"] for e in heures], format="%Y%m%d:%H%M", utc=True)
+    serie = lambda cle: pd.Series([e[cle] for e in heures], index=index, dtype=float)
+    return (serie("Gb(i)").clip(lower=0),
+            (serie("Gd(i)") + serie("Gr(i)")).clip(lower=0),
+            serie("T2m"), serie("WS10m"))
+
+
+def irradiationAnnuelle(lat, lon):
+    """
+    Irradiation annuelle moyenne PVGIS (SARAH-3, 2005-2023, sans horizon) du plan horizontal
+    et du plan d'inclinaison optimale. Retentee comme serieBrute.
+    --------
+    @param[in] lat, lon : point (deg WGS84)
+
+    @return h, h_opt : kWh/m2/an ; None si PVGIS n'a pas de donnee au point (en mer)
+    """
+    params = {"lat": lat, "lon": lon, "startyear": 2005, "endyear": 2023,
+              "raddatabase": "PVGIS-SARAH3", "horirrad": 1, "optrad": 1, "usehorizon": 0,
+              "outputformat": "json"}
+    for essai in range(1, config.N_ESSAIS + 1):
+        try:
+            r = requests.get(config.URL + "MRcalc", timeout=120, params=params)
+            if r.status_code == 400:
+                return None
+            r.raise_for_status()
+            mois = r.json()["outputs"]["monthly"]
+            break
+        except (requests.RequestException, ValueError, KeyError):
+            if essai == config.N_ESSAIS:
+                raise
+            time.sleep(min(config.PAUSE_DL * 2 ** (essai - 1), 300))
+    ans = len({m["year"] for m in mois})
+    return sum(m["H(h)_m"] for m in mois) / ans, sum(m["H(i_opt)_m"] for m in mois) / ans
+
+
+def cheminTable(lat, lon, fine=False):
+    """
+    Chemin de la table d'une cellule ou d'une sous-cellule.
+    --------
+    @param[in] lat, lon : centre de la cellule ou de la sous-cellule
+    @param[in] fine     : True pour une sous-cellule
+
+    @return chemin du .npz (ex: data/tables/lat_46/table_46.50_0.30.npz)
+    """
+    sous = f"lat_{int(lat)}"
+    if fine:
+        return os.path.join(config.DOSSIER_FIN, sous, f"table_{lat + 0.0:.3f}_{lon + 0.0:.3f}.npz")
+    return os.path.join(config.DOSSIER, sous, f"table_{lat + 0.0:.2f}_{lon + 0.0:.2f}.npz")
+
+
+def sousCellules(lat, lon):
+    """
+    Centres des quatre sous-cellules d'une cellule, un pixel SARAH-3 chacune.
+    --------
+    @param[in] lat, lon : centre de la cellule (multiples de PAS)
+
+    @return liste de 4 tuples (lat, lon)
+    """
+    d = config.PAS_FIN / 2
+    return [(round(lat + a, 3), round(lon + b, 3)) for a in (-d, d) for b in (-d, d)]
+
+
+def celluleMeteo(lat, lon):
+    """
+    Table d'un point : sa sous-cellule si elle a ete construite, sinon sa cellule.
+    --------
+    @param[in] lat, lon : coordonnees quelconques (deg WGS84)
+
+    @return lat_c, lon_c : centre de la table
+    @return fine         : True pour une sous-cellule
+    """
+    la = round(round(lat / config.PAS) * config.PAS, 2)
+    lo = round(round(lon / config.PAS) * config.PAS, 2)
+    d = config.PAS_FIN / 2
+    fla, flo = round(la + (d if lat >= la else -d), 3), round(lo + (d if lon >= lo else -d), 3)
+    if os.path.exists(cheminTable(fla, flo, fine=True)):
+        return fla, flo, True
+    return la, lo, False
+
+
+def tablesMeteo(points):
+    """
+    Tables meteo lues par des dalles, pour les metadonnees.
+    --------
+    @param[in] points : (lat, lon) des centres des dalles
+
+    @return dict : pas des cellules et sous-cellules, nombre de dalles sur chacune
+    """
+    fines = sum(celluleMeteo(lat, lon)[2] for lat, lon in points)
+    return {"pas_deg": config.PAS, "pas_fin_deg": config.PAS_FIN,
+            "dalles_cellule": len(points) - fines, "dalles_sous_cellule": fines}
 
 
 _cache = {}
 
+
 def chargerTable(lat, lon):
     """
-    Charge (avec cache) la table de la cellule contenant un point quelconque.
-    Point d'entree de la pipeline tuile : centreWGS84(...) puis chargerTable(...).
+    Table meteo d'un point quelconque, en cache : sa sous-cellule si elle existe, sinon sa
+    cellule.
     --------
-    @param[in] lat, lon : coordonnees quelconques (deg WGS84)
+    @param[in] lat, lon : point (deg WGS84)
 
-    @return B, D     : tableaux (n_alphas, n_betas, 12, 24), direct et diffus (ciel + reflechi sol), W/m2
-    @return SAZ, SEL : tableaux (12, 24), azimut et elevation du soleil (deg)
+    @return B, D     : (n_alphas, n_betas, 12, 24), direct et diffus (ciel + sol), W/m2
+    @return SAZ, SEL : (12, 24), azimut et elevation du soleil (deg)
+    @return profils  : dict des 10 profils (12, 24) de CLES_TEMP
     """
-    la = round(round(lat / config.PAS) * config.PAS, 2)
-    lo = round(round(lon / config.PAS) * config.PAS, 2)
+    la, lo, fine = celluleMeteo(lat, lon)
 
     if (la, lo) not in _cache:
-        chemin = cheminTable(la, lo)
+        chemin = cheminTable(la, lo, fine)
         if not os.path.exists(chemin):
-            raise FileNotFoundError(
-                f"Table meteo absente pour la cellule ({la}, {lo}) : {chemin}. "
-                f"A construire au prealable avec main_meteo.")
-        d = np.load(chemin)
-
-        _cache[(la, lo)] = (d["B"].astype(np.float32), d["D"].astype(np.float32),
-                            d["SAZ"], d["SEL"])      # stocke en float16, calcule en float32
+            raise FileNotFoundError(f"Table meteo absente ({la}, {lo}) : {chemin} ; "
+                                    f"construire avec main_meteo.")
+        with np.load(chemin) as d:
+            _cache[(la, lo)] = (d["B"].astype(np.float32), d["D"].astype(np.float32),
+                                d["SAZ"], d["SEL"], {cle: d[cle] for cle in CLES_TEMP})
 
     return _cache[(la, lo)]

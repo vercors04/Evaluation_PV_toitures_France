@@ -1,10 +1,12 @@
-import threading
-from tkinter import ttk, messagebox
-import tkinter as tk
-import os
-import geopandas as gpd
 import json
+import os
+import threading
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+import geopandas as gpd
 import pyogrio
+
 from src import config
 
 
@@ -31,13 +33,28 @@ def formater(valeur, unite):
     return f"{valeur:,.1f} {unite}".replace(",", " ")
 
 
+def echelleGpkg(chemin):
+    """
+    Echelle lue dans les metadonnees d'un gpkg de resultats.
+    --------
+    @param[in] chemin : chemin du .gpkg
+
+    @return str ; "" si absente ou illisible
+    """
+    try:
+        meta = pyogrio.read_info(chemin, layer="batiments")["dataset_metadata"]
+        return json.loads(meta.get("zone", "{}")).get("echelle", "")
+    except Exception:
+        return ""
+
+
 def formaterDuree(secondes):
     """
-    Formate une duree en secondes vers 'Xh YYmin ZZs' (heures/minutes omises si nulles).
+    Duree lisible ('1h 12min 05s', '3min 42s', '8s').
     --------
-    @param[in] secondes : duree en secondes
+    @param[in] secondes : duree (s)
 
-    @return str : duree formatee, ex. '1h 12min 05s', '3min 42s' ou '8s'
+    @return str
     """
     h, reste = divmod(int(secondes), 3600)
     m, s = divmod(reste, 60)
@@ -57,7 +74,7 @@ def afficherBilan(bilan):
     @return lignes : liste de chaines, une par ligne a afficher
     """
     if not bilan:
-        return ["Aucun bilan (zone introuvable ou aucun batiment)."]
+        return ["Aucun bilan : zone introuvable, hors metropole ou sans batiment."]
 
     lignes = []
     lignes.append(f"Fichier      : {bilan.get('fichier')}")
@@ -81,6 +98,12 @@ def afficherBilan(bilan):
         for k, v in bat.items():
             lignes.append(f"   {k:<20}: {v}")
 
+    prot = bilan.get("protections", {})
+    if prot:
+        lignes.append("Protections :")
+        for k, v in prot.items():
+            lignes.append(f"   {k:<20}: {v}")
+
     echecs = bilan.get("echecs", [])
     if echecs:
         lignes.append(f"{len(echecs)} dalle(s) en echec :")
@@ -90,18 +113,15 @@ def afficherBilan(bilan):
     return lignes
 
 
-
-
 def listesFichiers(parent, geojson_dir, gpkg_dir):
     """
-    Affiche cote a cote la liste des fichiers de deux dossiers (geojson / gpkg),
-    avec des boutons pour supprimer la selection et ouvrir le dossier parent.
+    Listes des geojson et des gpkg, avec suppression de la selection et ouverture du dossier.
     --------
-    @param[in] parent      : la boite ou ranger les listes
+    @param[in] parent      : cadre ou ranger les listes
     @param[in] geojson_dir : dossier des .geojson
     @param[in] gpkg_dir    : dossier des .gpkg
 
-    @return fonction rafraichir : rescanne les deux dossiers et met a jour l'affichage
+    @return fonction rafraichir
     """
     colonnes = ttk.Frame(parent); colonnes.pack(fill="both", expand=True)
     colonnes.columnconfigure(0, weight=1)
@@ -134,9 +154,12 @@ def listesFichiers(parent, geojson_dir, gpkg_dir):
         if not messagebox.askyesno("Confirmer", f"Supprimer {len(noms)} fichier(s) ?\n" + "\n".join(noms)):
             return
         for nom in noms:
-            os.remove(os.path.join(dossier, nom))
+            try:
+                os.remove(os.path.join(dossier, nom))
+            except OSError as e:
+                messagebox.showerror("Suppression", f"{nom} : {e}")
         rafraichir()
-    
+
     ttk.Button(colonnes, text="Supprimer",
                command=lambda: supprimer(liste_geojson, geojson_dir)).grid(row=2, column=0, pady=2)
     ttk.Button(colonnes, text="Supprimer",
@@ -144,9 +167,8 @@ def listesFichiers(parent, geojson_dir, gpkg_dir):
 
     ttk.Button(parent, text="Ouvrir dans l'explorateur",
                command=lambda: os.startfile(os.path.dirname(geojson_dir))).pack(pady=4)
-    
-    ttk.Button(parent, text="Rafraîchir",
-               command=lambda: rafraichir()).pack(pady=5)
+
+    ttk.Button(parent, text="Rafraîchir", command=rafraichir).pack(pady=5)
 
     rafraichir()
     return rafraichir
@@ -154,14 +176,13 @@ def listesFichiers(parent, geojson_dir, gpkg_dir):
 
 def statsRapide(parent_selec, gpkg_dir, parent_stats):
     """
-    Liste des gpkg calcules et statistiques (total, mediane, moyenne, P10-P90 par colonne) du fichier choisi.
-    La lecture du gpkg tourne dans un thread pour ne pas geler l'interface.
+    Liste des gpkg et statistiques du fichier choisi (total, mediane, moyenne, P10-P90).
     --------
-    @param[in] parent_selec : la boite ou ranger la liste des fichiers
+    @param[in] parent_selec : cadre de la liste des fichiers
     @param[in] gpkg_dir     : dossier des .gpkg
-    @param[in] parent_stats : la boite ou afficher les statistiques
+    @param[in] parent_stats : cadre des statistiques
 
-    @return fonction rafraichir : rescanne le dossier et met a jour la liste
+    @return fonction rafraichir
     """
     parent_selec.columnconfigure(1, weight=1)
     parent_selec.rowconfigure(1, weight=1)
@@ -173,7 +194,6 @@ def statsRapide(parent_selec, gpkg_dir, parent_stats):
     scrollbar_gpkg.grid(row=1, column=2, sticky="ns")
     liste_gpkg.configure(yscrollcommand=scrollbar_gpkg.set)
 
-    
     scrollbar_x = ttk.Scrollbar(parent_stats, orient="horizontal", command=lambda *a: zone_stats.xview(*a))
     scrollbar_x.pack(side="bottom", fill="x")
 
@@ -181,72 +201,74 @@ def statsRapide(parent_selec, gpkg_dir, parent_stats):
     zone_stats.pack(fill="both", expand=True)
     zone_stats.configure(state="disabled")
 
-
     def rafraichir():
         liste_gpkg.delete(0, "end")
         if os.path.isdir(gpkg_dir):
             for nom in sorted(os.listdir(gpkg_dir)):
                 liste_gpkg.insert("end", nom)
 
-    def stats():
-        zone = liste_gpkg.curselection()
-        if not zone:
-            return
-        nom = liste_gpkg.get(zone[0])
-        btn_stats.configure(state="disabled")
+    def afficher(texte):
         zone_stats.configure(state="normal")
         zone_stats.delete("1.0", "end")
-        zone_stats.insert("1.0", "Calcul en cours...")
+        zone_stats.insert("1.0", texte)
         zone_stats.configure(state="disabled")
+
+    def selection():
+        choix = liste_gpkg.curselection()
+        return liste_gpkg.get(choix[0]) if choix else None
+
+    def stats():
+        nom = selection()
+        if nom is None:
+            return
+        btn_stats.configure(state="disabled")
+        afficher("Calcul en cours...")
         threading.Thread(target=calcul, args=(nom,), daemon=True).start()
 
     def calcul(nom):
-        gdf = gpd.read_file(os.path.join(gpkg_dir, nom), ignore_geometry=True)
-
-        lignes = [f"Fichier : {nom}", f"Nombre de toitures : {len(gdf)}", ""]
-
-        for nom_colonne, (libelle, unite) in config.COLONNES_SORTIE.items():
-            if nom_colonne not in gdf.columns:
-                continue
-            col = gdf[nom_colonne]
-            texte = (f"médiane={formater(col.median(), unite)}  "
-                     f"moyenne={formater(col.mean(), unite)}  "
-                     f"P10–P90={formater(col.quantile(0.10), unite)} à {formater(col.quantile(0.90), unite)}")
-            if unite not in ("m", "deg"):
-                texte = f"total={formater(col.sum(), unite)}  " + texte
-            lignes.append(f"{libelle:<30}: {texte}")
+        try:
+            gdf = gpd.read_file(os.path.join(gpkg_dir, nom), ignore_geometry=True)
+            lignes = [f"Fichier : {nom}", f"Nombre de toitures : {len(gdf)}", ""]
+            for nom_colonne, (libelle, unite) in config.COLONNES_SORTIE.items():
+                if nom_colonne not in gdf.columns:
+                    continue
+                col = gdf[nom_colonne]
+                texte = (f"médiane={formater(col.median(), unite)}  "
+                         f"moyenne={formater(col.mean(), unite)}  "
+                         f"P10–P90={formater(col.quantile(0.10), unite)} à "
+                         f"{formater(col.quantile(0.90), unite)}")
+                if unite not in ("m", "deg"):
+                    texte = f"total={formater(col.sum(), unite)}  " + texte
+                lignes.append(f"{libelle:<30}: {texte}")
+            resultat = "\n\n".join(lignes)
+        except Exception as e:
+            resultat = f"[ERREUR] {nom} : {e}"
 
         def montrer():
-            zone_stats.configure(state="normal")
-            zone_stats.delete("1.0", "end")
-            zone_stats.insert("1.0", "\n\n".join(lignes))
-            zone_stats.configure(state="disabled")
+            afficher(resultat)
             btn_stats.configure(state="normal")
         zone_stats.after(0, montrer)
 
     def metadonnees():
-        zone = liste_gpkg.curselection()
-        if not zone:
+        nom = selection()
+        if nom is None:
             return
-        nom = liste_gpkg.get(zone[0])
-        info = pyogrio.read_info(os.path.join(gpkg_dir, nom), layer="batiments")
+        try:
+            meta = pyogrio.read_info(os.path.join(gpkg_dir, nom), layer="batiments")["dataset_metadata"]
+            lisible = {}
+            for cle, valeur in meta.items():
+                try:
+                    lisible[cle] = json.loads(valeur)
+                except (TypeError, ValueError):
+                    lisible[cle] = valeur
+            afficher(json.dumps(lisible, indent=2, ensure_ascii=False))
+        except Exception as e:
+            afficher(f"[ERREUR] {nom} : {e}")
 
-        zone_stats.configure(state="normal")
-        zone_stats.delete("1.0", "end")
-        zone_stats.insert("1.0", json.dumps(info["dataset_metadata"], indent=2, ensure_ascii=False))
-        zone_stats.configure(state="disabled")
-
-
-
-    ttk.Button(parent_selec, text="Rafraîchir",
-               command=lambda: rafraichir()).grid(row=2, column=1, pady=2)
-    
-    btn_stats = ttk.Button(parent_selec, text="Statistiques",
-                           command=lambda: stats())
+    ttk.Button(parent_selec, text="Rafraîchir", command=rafraichir).grid(row=2, column=1, pady=2)
+    btn_stats = ttk.Button(parent_selec, text="Statistiques", command=stats)
     btn_stats.grid(row=3, column=1, pady=2)
-
-    btn_meta = ttk.Button(parent_selec, text="Métadonnées", command=lambda: metadonnees())
-    btn_meta.grid(row=4, column=1, pady=2)
+    ttk.Button(parent_selec, text="Métadonnées", command=metadonnees).grid(row=4, column=1, pady=2)
 
     rafraichir()
     return rafraichir

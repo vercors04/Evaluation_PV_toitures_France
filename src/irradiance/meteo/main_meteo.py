@@ -1,6 +1,3 @@
-"""
-    python -m src.irradiance.meteo.main_meteo
-"""
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -8,28 +5,50 @@ from concurrent.futures import ProcessPoolExecutor
 from src.acquisition.zone import zone
 from src.irradiance.meteo.grille_calculs import grilleCellules, construireCellule
 from src.irradiance.meteo.grille_fct import cheminTable
+from src.tuile.donnees_dalle import enMetropole
 from src import config
 
 
-
 def _faire(cellule):
-    """Construit une cellule si absente. Fonction au niveau module = picklable par les processus."""
+    """
+    Construit une cellule absente, saute les autres.
+    --------
+    @param[in] cellule : (lat, lon) du centre
+
+    @return (lat, lon, etat)
+    """
     lat, lon = cellule
     if os.path.exists(cheminTable(lat, lon)):
-        return (lat, lon, "deja fait")
+        return (lat, lon, "deja faite")
     try:
         construireCellule(lat, lon)
-        return (lat, lon, "OK")
+        return (lat, lon, "construite")
     except Exception as e:
         return (lat, lon, f"ECHEC : {e}")
 
 
-def main():
-    os.makedirs(config.DOSSIER, exist_ok=True)
+def zonesTracees():
+    """
+    Noms des contours presents dans DIR_GEOJSON, utilisables comme echelle "polygone".
+    --------
+    @return liste de noms, triee
+    """
+    if not os.path.isdir(config.DIR_GEOJSON):
+        return []
+    return sorted(os.path.splitext(n)[0] for n in os.listdir(config.DIR_GEOJSON)
+                  if n.endswith(".geojson"))
 
+
+def choisirZone():
+    """
+    Demande au terminal l'echelle et le nom de la zone.
+    --------
+    @return polygone shapely en WGS84 ; None si le choix est invalide ou la zone introuvable
+    """
     print("Choix de l'echelle territoriale:")
-    print("0 : Adresse\n1 : Commune\n2 : Departement\n3 : Region\n4 : France")
-    choix = input("Choisissez l'echelle (0-4) : ").strip()
+    print("0 : Adresse\n1 : Commune\n2 : Departement\n3 : Region\n4 : France"
+          "\n5 : Zone tracee")
+    choix = input("Choisissez l'echelle (0-5) : ").strip()
 
     code_dep = None
     if choix == "0":
@@ -43,22 +62,45 @@ def main():
         echelle, nom_zone = "region", input("Entrez le nom d'une region : ").strip()
     elif choix == "4":
         echelle, nom_zone = "nationale", "France"
+    elif choix == "5":
+        echelle = "polygone"
+        print("zones disponibles :", ", ".join(zonesTracees()) or "aucune")
+        nom_zone = input("Entrez le nom de la zone tracee : ").strip()
     else:
-        print("Choisissez entre 0 et 4."); return
+        print("Choisissez entre 0 et 5."); return None
 
     polygone = zone(echelle, nom_zone, code_dep)
     if polygone is None:
-        print("zone introuvable"); return
+        print("zone introuvable")
+    return polygone
 
-    pts = grilleCellules(polygone)
-    print(f"{len(pts)} cellules a construire dans {config.DOSSIER}/ sur {config.N_COEURS} coeurs (reprise possible)")
-    ratees, t0 = [], time.time()
+
+def main():
+    """
+    Construit les tables meteo absentes de la zone choisie au terminal.
+    --------
+    @return None
+    """
+    os.makedirs(config.DOSSIER, exist_ok=True)
+    polygone = choisirZone()
+    if polygone is None:
+        return
+
+    pts = [c for c in grilleCellules(polygone) if enMetropole(*c)]
+    print(f"{len(pts)} cellules a construire dans {config.DOSSIER}/ sur {config.N_COEURS} "
+          f"coeurs (reprise possible)")
+    ratees, bilan, t0 = [], {}, time.time()
     with ProcessPoolExecutor(max_workers=config.N_COEURS) as ex:
         for k, (lat, lon, etat) in enumerate(ex.map(_faire, pts), 1):
             print(f"[{k}/{len(pts)}] {lat:.2f}, {lon:.2f}  {etat}")
-            if etat.startswith("ECHEC"):
+            cle = "ECHEC" if etat.startswith("ECHEC") else etat
+            bilan[cle] = bilan.get(cle, 0) + 1
+            if cle == "ECHEC":
                 ratees.append((lat, lon))
-    print(f"Termine en {time.time() - t0:.0f}s. {len(ratees)} echec(s) : {ratees}")
+    print(f"Termine en {time.time() - t0:.0f}s. "
+          + ", ".join(f"{n} {k}" for k, n in sorted(bilan.items())))
+    if ratees:
+        print(f"{len(ratees)} echec(s) : {ratees}")
 
 
 if __name__ == "__main__":

@@ -2,15 +2,22 @@ settings.json
 .vscode/
 __pycache__/
 
-
 docs/
 build/
 dist/
-src/debug/
 data/
 statistiques/
-main.py
+src/debug/comparaisons/batiments.csv
 
 00_rapport/
 00_stats_rapport/
 validation/
+01_RoofTool_1.1.0/
+
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz

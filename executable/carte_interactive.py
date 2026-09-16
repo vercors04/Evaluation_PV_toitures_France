@@ -1,31 +1,14 @@
-"""
-Carte interactive des resultats calcules (folium), ouverte dans une fenetre native.
-
-Fonctionnement en deux temps, pour ne jamais refaire un calcul deja fait :
-  1. majStats() agrege chaque gpkg nouveau ou modifie en statistiques par commune,
-     conservees dans data/processed/stats_carte.json (cache incremental) ;
-  2. construireCarte() genere le HTML depuis ce cache. Contours embarques :
-     regions et departements de metropole, communes des seuls departements
-     ayant des donnees (le HTML reste leger).
-
-Trois niveaux (regions, departements, communes) bascules automatiquement selon
-le zoom. Chaque entite calculee a une popup de synthese et un bouton ouvrant un
-panneau de detail (total, mediane, moyenne et P10-P90 par colonne de sortie).
-
-Point d'entree interface : genererCarte() puis ouvrirCarte(chemin) dans un process.
-viderCache() supprime cache et HTML, a faire si les fichiers de contours changent.
-Test direct : python -m executable.carte_interactive
-"""
 import os
 import json
 
 import folium
 import pandas as pd
 import geopandas as gpd
-from folium.plugins import Geocoder
+import pyogrio
 
 from src import config
-from executable.tool_fct_exe import formater
+from executable.tool_fct_exe import formater, echelleGpkg
+from executable.carte_style import CSS, REMPLI, OPACITE, OPACITE_SURVOL, fondsDeCarte
 
 
 DIR_CONTOURS  = os.path.join(config.BASE_DATA, "data", "contours")
@@ -37,35 +20,19 @@ REGIONS = ["auvergne-rhone-alpes", "bourgogne-franche-comte", "bretagne",
            "ile-de-france", "normandie", "nouvelle-aquitaine", "occitanie",
            "pays-de-la-loire", "provence-alpes-cote-d-azur"]
 
-ZOOM_DEP = 8            # zoom a partir duquel les departements remplacent les regions
-ZOOM_COM = 11           # zoom a partir duquel les communes s'ajoutent
-SEUIL_DEP_COMPLET = 0.9  # part des communes avec donnees pour compter un departement entier
+ZOOM_DEP = 8
+ZOOM_COM = 11
+SEUIL_DEP_COMPLET = 0.9
 
-# habillage fixe de la page (popups, panneau de detail, bandeau de titre)
-CSS = """
+CSS_CARTE = """
 <style>
-.leaflet-popup-content-wrapper { border-radius: 10px; }
-.leaflet-popup-content { margin: 10px 14px; width: 300px !important; }
-.leaflet-popup-content table { width: 100%; border-collapse: collapse;
-                               font-family: Arial, sans-serif; }
-.leaflet-popup-content th, .leaflet-popup-content td { padding: 5px 6px;
-    border-bottom: 1px solid #eee; font-size: 12.5px; }
-.leaflet-popup-content th { text-align: left; color: #555; font-weight: 600; }
-.leaflet-popup-content td { text-align: right; font-weight: 700; color: #1A252C; }
-.btn-details { cursor: pointer; border: none; border-radius: 6px; padding: 5px 10px;
-               background: #E67E22; color: white; font-weight: 600; }
-#panneau-details { position: fixed; top: 80px; right: 15px; width: 600px;
-    max-height: 75%; overflow-y: auto; display: none; z-index: 9999;
-    background: #fff; border-radius: 12px; padding: 15px 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.25); font-family: Arial, sans-serif; }
-#panneau-details h3 { margin: 0 0 2px 0; color: #1A252C; }
-#panneau-details .detail-note { margin: 0 0 10px 0; color: #7F8C8D; font-size: 12px; }
-#panneau-details table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-#panneau-details th, #panneau-details td { padding: 4px 6px;
-    border-bottom: 1px solid #eee; text-align: right; }
-#panneau-details th { text-align: left; color: #555; font-weight: 600; }
+.leaflet-popup-content { width: 300px !important; }
+#panneau-details { position: fixed; top: 80px; right: 15px; width: 600px; max-height: 75%;
+                   overflow-y: auto; display: none; z-index: 9999; }
+#panneau-details h3 { margin: 0 0 2px 0; font-size: 15px; }
 #detail-fermer { float: right; cursor: pointer; color: #7F8C8D; font-size: 16px; }
 </style>"""
+
 
 def chargerContours(niveau, regions=REGIONS):
     """
@@ -94,12 +61,11 @@ def chargerContours(niveau, regions=REGIONS):
 
 def chargerZone(chemin_gpkg):
     """
-    Polygone de la zone calculee : geojson apparie au gpkg (meme nom de base),
-    ecrit par la pipeline dans DIR_GEOJSON. Tolere les variantes - / _ du nom.
+    Contour de la zone calculee, lu dans le geojson de meme nom (variantes - et _ tolerees).
     --------
-    @param[in] chemin_gpkg : chemin du .gpkg de resultats
+    @param[in] chemin_gpkg : chemin du .gpkg
 
-    @return polygone shapely en WGS84 ; None si le geojson est introuvable
+    @return polygone shapely WGS84 ; None si le geojson est introuvable
     """
     base = os.path.splitext(os.path.basename(chemin_gpkg))[0]
     for nom in (base, base.replace("-", "_"), base.replace("_", "-")):
@@ -111,31 +77,23 @@ def chargerZone(chemin_gpkg):
 
 def agregerGpkg(chemin, communes):
     """
-    Resume un gpkg de resultats par commune : compte, somme, mediane et quantiles P10/P90.
-    Les communes voisines touchees par quelques batiments frontaliers (contours
-    generalises differents de la frontiere IGN) sont ecartees via chargerZone.
+    Resume un gpkg par commune : compte, somme, mediane, P10 et P90 ; communes hors du contour
+    de la zone ecartees.
     --------
-    @param[in] chemin   : chemin du .gpkg (1 ligne par batiment)
+    @param[in] chemin   : chemin du .gpkg
     @param[in] communes : GeoDataFrame des contours de communes (code, geometry, WGS84)
 
-    @return dict {code_insee: {"n": int, "somme": {...}, "med": {...}, "p10": {...}, "p90": {...}}}
+    @return dict {code_insee: {"n", "somme", "med", "p10", "p90"}}
     """
-    try:
-        import pyogrio                                    # ne lit que les colonnes utiles
-        champs = list(pyogrio.read_info(chemin)["fields"])
-        gdf = gpd.read_file(chemin, columns=[c for c in config.COLONNES_SORTIE if c in champs])
-    except Exception:
-        gdf = gpd.read_file(chemin)
-    cols = [c for c in config.COLONNES_SORTIE if c in gdf.columns]
+    champs = set(pyogrio.read_info(chemin)["fields"])
+    cols = [c for c in config.COLONNES_SORTIE if c in champs]
+    gdf = gpd.read_file(chemin, columns=cols)
 
     pts = gpd.GeoDataFrame(gdf[cols], geometry=gdf.geometry.representative_point(),
                            crs=gdf.crs).to_crs(4326)
     minx, miny, maxx, maxy = pts.total_bounds
-    proches = communes.cx[minx:maxx, miny:maxy]           # evite le sjoin France entiere
+    proches = communes.cx[minx:maxx, miny:maxy]
 
-    # une commune n'est comptee que si son interieur est dans la zone calculee ;
-    # ecarte les communes voisines touchees par des batiments frontaliers et les
-    # calculs a l'adresse (zone plus petite qu'une commune, stats trompeuses)
     zone = chargerZone(chemin)
     if zone is not None:
         proches = proches[proches.representative_point().within(zone)]
@@ -157,11 +115,12 @@ def agregerGpkg(chemin, communes):
 
 def majStats(on_log=print):
     """
-    Met a jour le cache : agrege les gpkg nouveaux ou modifies, retire les disparus.
+    Met a jour le cache : agrege les gpkg nouveaux ou modifies (hors zones tracees), retire les
+    disparus.
     --------
-    @param[in] on_log : callback (message) pour suivre l'avancement
+    @param[in] on_log : callback (message)
 
-    @return stats, change : contenu du cache et bool indiquant s'il a change
+    @return stats, change : contenu du cache, True s'il a change
     """
     stats = {"version": 2, "fichiers": {}}
     if os.path.exists(FICHIER_STATS):
@@ -176,10 +135,12 @@ def majStats(on_log=print):
     presents = {}
     if os.path.isdir(config.OUT_DIR_PROCESSED):
         presents = {nom: os.path.getmtime(os.path.join(config.OUT_DIR_PROCESSED, nom))
-                    for nom in os.listdir(config.OUT_DIR_PROCESSED) if nom.endswith(".gpkg")}
+                    for nom in os.listdir(config.OUT_DIR_PROCESSED)
+                    if nom.endswith(".gpkg")
+                    and echelleGpkg(os.path.join(config.OUT_DIR_PROCESSED, nom)) != "polygone"}
 
     change = False
-    for nom in list(stats["fichiers"]):                   # fichiers supprimes du dossier
+    for nom in list(stats["fichiers"]):
         if nom not in presents:
             del stats["fichiers"][nom]
             change = True
@@ -204,13 +165,12 @@ def majStats(on_log=print):
 
 def tableauCommunes(stats):
     """
-    Fusionne les stats par commune de tous les fichiers en un tableau plat.
-    Si une commune apparait dans plusieurs gpkg (ex : ville puis son departement),
-    garde le fichier au plus grand nombre de batiments pour ne pas compter deux fois.
+    Stats par commune de tous les fichiers en un tableau plat ; commune presente dans plusieurs
+    gpkg : celui au plus grand nombre de batiments.
     --------
-    @param[in] stats : contenu du cache (cle "fichiers")
+    @param[in] stats : contenu du cache
 
-    @return DataFrame, 1 ligne par commune (colonnes code, n, X_s, X_md, X_p10, X_p90)
+    @return DataFrame, 1 ligne par commune (code, n, X_s, X_md, X_p10, X_p90)
     """
     communes = {}
     for fichier in stats["fichiers"].values():
@@ -230,19 +190,40 @@ def tableauCommunes(stats):
 
 
 def agreger(df, cle):
-    """Agrege un tableau plat par cle : sommes des X_s et n (les quantiles ne s'agregent pas)."""
+    """
+    Somme par cle des colonnes X_s et de n.
+    --------
+    @param[in] df  : tableau plat (voir tableauCommunes)
+    @param[in] cle : colonne de regroupement
+
+    @return DataFrame agrege
+    """
     agg = {"n": "sum"}
     agg.update({c: "sum" for c in df.columns if c.endswith("_s")})
     return df.groupby(cle, as_index=False).agg(agg)
 
 
 def colonne(df, nom):
-    """Colonne du DataFrame, ou colonne de NaN si absente."""
+    """
+    Colonne d'un DataFrame, ou colonne de NaN si absente.
+    --------
+    @param[in] df  : DataFrame
+    @param[in] nom : nom de la colonne
+
+    @return Series
+    """
     return df[nom] if nom in df.columns else pd.Series(float("nan"), index=df.index)
 
 
 def valeursDetails(ligne, colonnes):
-    """Liste [total, mediane, moyenne, "P10 a P90"] par entree de COLONNES_SORTIE (None si absente)."""
+    """
+    [total, mediane, moyenne, "P10 a P90"] par entree de COLONNES_SORTIE.
+    --------
+    @param[in] ligne    : ligne du tableau plat
+    @param[in] colonnes : colonnes disponibles
+
+    @return liste (None si la colonne est absente)
+    """
     vals = []
     for c, (_, unite) in config.COLONNES_SORTIE.items():
         if f"{c}_s" in colonnes and pd.notna(ligne.get(f"{c}_s")) and ligne["n"] > 0:
@@ -261,24 +242,23 @@ def valeursDetails(ligne, colonnes):
 
 def preparer(contours, df, cle_contours, cle_df, prefixe, details, titres):
     """
-    Joint les stats aux contours et fabrique les colonnes texte de la popup
-    (production, toitures, parts plate / inclinee, bouton de detail).
-    Remplit au passage les dicts details et titres pour le panneau lateral.
+    Joint les stats aux contours et prepare les colonnes de la popup ; remplit details et
+    titres pour le panneau lateral.
     --------
     @param[in] contours     : GeoDataFrame des contours du niveau
-    @param[in] df           : stats du niveau (tableau plat, voir tableauCommunes / agreger)
-    @param[in] cle_contours, cle_df : colonnes de jointure cote contours / cote stats
-    @param[in] prefixe      : prefixe des cles du panneau de detail ("r", "d" ou "c")
+    @param[in] df           : stats du niveau (voir tableauCommunes, agreger)
+    @param[in] cle_contours, cle_df : colonnes de jointure cote contours et cote stats
+    @param[in] prefixe      : prefixe des cles du panneau ("r", "d" ou "c")
     @param[in] details, titres : dicts remplis pour le panneau lateral
 
-    @return GeoDataFrame reduit a (cle, nom, geometry, colonnes de popup)
+    @return GeoDataFrame (cle, nom, geometry, colonnes de popup)
     """
     g = contours.merge(df, left_on=cle_contours, right_on=cle_df, how="left")
 
     n     = colonne(g, "n")
     prod  = colonne(g, "prod_an_kwh_s")
-    tot   = colonne(g, "surf_tot_m2_s")
-    plate = colonne(g, "surf_plate_m2_s")
+    tot   = colonne(g, "surf_m2_s")
+    plate = colonne(g, "surf_m2_plat_s")
     pct   = (plate / tot * 100).where(tot > 0)
 
     g["p_prod"] = prod.map(lambda v: formater(v, "Wh"))
@@ -292,12 +272,12 @@ def preparer(contours, df, cle_contours, cle_df, prefixe, details, titres):
             cle = prefixe + str(ligne[cle_contours])
             details[cle] = valeursDetails(ligne, g.columns)
             titres[cle] = str(ligne["nom"])
-            boutons.append(f"<button class=\"btn-details\" "
+            boutons.append(f"<button class=\"btn-sobre\" "
                            f"onclick=\"montrerDetails('{cle}')\">Voir le détail</button>")
         else:
             boutons.append("")
     g["p_btn"] = boutons
-    g["p_fill"] = [1 if b else 0 for b in boutons]     # remplissage colore si donnees
+    g["p_fill"] = [1 if b else 0 for b in boutons]
 
     for c in ("p_prod", "p_toit", "p_plat", "p_incl"):
         g[c] = g[c].replace("-", "Non calculé")
@@ -321,9 +301,9 @@ def couche(gdf, alias_nom, couleur, epaisseur, note="", champs_sup=()):
               "Toits plats :", "Toits inclinés :", *(a for _, a in champs_sup), ""]
     return folium.GeoJson(
         gdf,
-        style_function=lambda x: {"color": couleur, "weight": epaisseur, "fillColor": "#E67E22",
-                                  "fillOpacity": 0.18 if x["properties"]["p_fill"] else 0.0},
-        highlight_function=lambda x: {"fillColor": "#FBFF00", "fillOpacity": 0.35},
+        style_function=lambda x: {"color": couleur, "weight": epaisseur, "fillColor": REMPLI,
+                                  "fillOpacity": OPACITE if x["properties"]["p_fill"] else 0.0},
+        highlight_function=lambda x: {"weight": epaisseur + 2, "fillOpacity": OPACITE_SURVOL},
         tooltip=folium.GeoJsonTooltip(fields=["nom"], aliases=[alias_nom]),
         popup=folium.GeoJsonPopup(fields=champs, aliases=alias))
 
@@ -341,7 +321,6 @@ def construireCarte(stats):
     gdf_reg["geometry"] = gdf_reg.geometry.simplify(0.002, preserve_topology=True)
     gdf_dep["geometry"] = gdf_dep.geometry.simplify(0.002, preserve_topology=True)
 
-    # stats par commune depuis le cache ; seules les regions avec donnees sont chargees
     df_com = tableauCommunes(stats)
     df_com["dep"] = df_com["code"].str[:2]
     dep_region = gdf_dep.set_index("code")["region"]
@@ -349,7 +328,6 @@ def construireCarte(stats):
     gdf_com = chargerContours("communes", [r for r in REGIONS
                                            if r.replace("-", " ").title() in regions_avec])
 
-    # departements montres si quasi complets
     total_par_dep = gdf_com.groupby(gdf_com["code"].str[:2]).size()
     avec_par_dep  = df_com.groupby("dep").size()
     complets = [d for d, nb in avec_par_dep.items()
@@ -359,29 +337,22 @@ def construireCarte(stats):
     df_dep["region"] = df_dep["dep"].map(dep_region)
     df_reg = agreger(df_dep.drop(columns="dep"), "region")
 
-    # seules les communes des departements avec donnees sont gardees, puis simplifiees
     gdf_com = gdf_com[gdf_com["code"].str[:2].isin(set(df_com["dep"]))].copy()
     gdf_com["geometry"] = gdf_com.geometry.simplify(0.001, preserve_topology=True)
 
-    # jointure stats + contours, popups, panneau de detail
     details, titres = {}, {}
     g_reg = preparer(gdf_reg, df_reg, "region", "region", "r", details, titres)
     g_dep = preparer(gdf_dep, df_dep.drop(columns="region"), "code", "dep", "d", details, titres)
     g_com = preparer(gdf_com, df_com, "code", "code", "c", details, titres)
 
-    # au niveau region : compte de departements complets dans la popup, et
-    # teinte reservee aux regions entierement calculees (pas de faux "tout calcule")
     nb_total = gdf_dep.groupby("region").size()
     nb_ok    = df_dep.groupby("region").size()
     g_reg["p_deps"] = g_reg["region"].map(lambda r: f"{int(nb_ok.get(r, 0))} / {int(nb_total.get(r, 0))}")
     g_reg["p_fill"] = (g_reg["region"].map(nb_ok).fillna(0) >= g_reg["region"].map(nb_total)).astype(int)
 
-    carte = folium.Map(location=(46.8, 2.3), zoom_start=6, tiles="CartoDB Positron",
+    carte = folium.Map(location=(46.8, 2.3), zoom_start=6, tiles=None,
                        control_scale=True, prefer_canvas=True)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri", name="Vue satellite", overlay=False, control=True, show=False).add_to(carte)
-    Geocoder(position="topright", zoom=13, add_marker=False).add_to(carte)
+    fondsDeCarte(carte)
 
     fg_reg = folium.FeatureGroup(name="Régions", control=False)
     fg_dep = folium.FeatureGroup(name="Départements", control=False, show=False)
@@ -396,7 +367,6 @@ def construireCarte(stats):
     fg_com.add_to(carte)
     folium.LayerControl(position="topleft", collapsed=True).add_to(carte)
 
-    # bascule automatique des niveaux selon le zoom
     niveaux = [f"[{fg_reg.get_name()}, 0, {ZOOM_DEP}]",
                f"[{fg_dep.get_name()}, {ZOOM_DEP}, 99]",
                f"[{fg_com.get_name()}, {ZOOM_COM}, 99]"]
@@ -417,10 +387,9 @@ def construireCarte(stats):
     }});
     </script>"""
 
-    # panneau lateral de detail, rempli au clic sur le bouton d'une popup
     libelles = [lib for lib, _ in config.COLONNES_SORTIE.values()]
     js_details = f"""
-    <div id="panneau-details">
+    <div id="panneau-details" class="encart">
         <span id="detail-fermer" onclick="fermerDetails()">&#10005;</span>
         <div id="detail-contenu"></div>
     </div>
@@ -431,12 +400,15 @@ def construireCarte(stats):
     function montrerDetails(cle) {{
         var d = DETAILS[cle];
         if (!d) return;
-        var html = "<h3>" + TITRES[cle] + "</h3><p class='detail-note'>total, puis par bâtiment</p>";
-        html += "<table><tr><th></th><th>total</th><th>médiane</th><th>moyenne</th><th>P10–P90</th></tr>";
+        var html = "<h3>" + TITRES[cle] + "</h3>"
+                 + "<p class='encart-note'>total, puis par bâtiment</p>";
+        html += "<table class='tbl-stats'><tr class='entete'><th></th><th>total</th>"
+              + "<th>médiane</th><th>moyenne</th><th>P10–P90</th></tr>";
         for (var i = 0; i < d.length; i++) {{
             if (!d[i]) continue;
             html += "<tr><th>" + LIBELLES[i] + "</th><td>" + d[i][0] + "</td><td>"
-                  + d[i][1] + "</td><td>" + d[i][2] + "</td><td>" + d[i][3] + "</td></tr>";
+                  + d[i][1] + "</td><td>" + d[i][2] + "</td><td class='interv'>"
+                  + d[i][3] + "</td></tr>";
         }}
         document.getElementById("detail-contenu").innerHTML = html + "</table>";
         document.getElementById("panneau-details").style.display = "block";
@@ -449,18 +421,12 @@ def construireCarte(stats):
     noms = sorted(nom.replace(".gpkg", "").replace("-", " ") for nom in stats["fichiers"])
     lignes = "".join(f'<li>{nom}</li>' for nom in noms)
     secteurs = f"""
-    <div style="position: fixed; bottom: 25px; left: 25px; z-index: 9999;
-                background-color: rgba(255,255,255,0.95); padding: 12px 18px;
-                border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                font-family: Arial, sans-serif; max-height: 260px; overflow-y: auto;">
-        <div style="font-size: 13px; font-weight: bold; color: #1A252C;
-                    border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 6px;">
-            Secteurs traités ({len(noms)})</div>
-        <ul style="list-style: none; padding: 0; margin: 0; font-size: 12.5px;
-                   color: #2C3E50; line-height: 1.7;">{lignes}</ul>
+    <div id="secteurs" class="encart">
+        <div class="encart-titre">Secteurs traités ({len(noms)})</div>
+        <ul>{lignes}</ul>
     </div>"""
 
-    for element in (CSS, secteurs, js_details, js_zoom):
+    for element in (CSS, CSS_CARTE, secteurs, js_details, js_zoom):
         carte.get_root().html.add_child(folium.Element(element))
 
     os.makedirs(os.path.dirname(FICHIER_CARTE), exist_ok=True)
@@ -485,10 +451,9 @@ def genererCarte(on_log=print):
 
 def viderCache():
     """
-    Supprime le cache de stats et le HTML : tout sera reconstruit au prochain
-    affichage (plusieurs minutes). Necessaire apres une mise a jour des fichiers
-    de contours (data/contours), sinon les codes INSEE du cache peuvent ne plus
-    correspondre aux nouveaux contours.
+    Supprime le cache de stats et le HTML.
+    --------
+    @return None
     """
     for chemin in (FICHIER_STATS, FICHIER_CARTE):
         if os.path.exists(chemin):
@@ -497,11 +462,11 @@ def viderCache():
 
 def ouvrirCarte(chemin):
     """
-    Ouvre la carte dans une fenetre native (pywebview / WebView2). A lancer dans
-    un process dedie depuis l'interface : la boucle pywebview est bloquante.
-    Sans pywebview, repli sur le navigateur par defaut.
+    Ouvre la carte dans une fenetre pywebview, ou dans le navigateur sans pywebview.
     --------
-    @param[in] chemin : chemin du HTML a afficher
+    @param[in] chemin : chemin du HTML
+
+    @return None
     """
     try:
         import webview
@@ -509,7 +474,7 @@ def ouvrirCarte(chemin):
         import webbrowser
         webbrowser.open("file:///" + os.path.abspath(chemin).replace("\\", "/"))
         return
-    webview.create_window("Carte des toitures", chemin, width=1200, height=800)
+    webview.create_window("Carte des résultats", chemin, width=1200, height=800)
     webview.start()
 
 
