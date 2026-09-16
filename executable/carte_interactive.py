@@ -227,7 +227,7 @@ def valeursDetails(ligne, colonnes):
     vals = []
     for c, (_, unite) in config.COLONNES_SORTIE.items():
         if f"{c}_s" in colonnes and pd.notna(ligne.get(f"{c}_s")) and ligne["n"] > 0:
-            total = formater(ligne[f"{c}_s"], unite) if unite not in ("m", "deg") else "-"
+            total = formater(ligne[f"{c}_s"], unite) if unite not in config.SANS_TOTAL else "-"
             moyenne = formater(ligne[f"{c}_s"] / ligne["n"], unite)
             if f"{c}_md" in colonnes:
                 mediane = formater(ligne[f"{c}_md"], unite)

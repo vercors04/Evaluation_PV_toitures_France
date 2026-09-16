@@ -1,6 +1,8 @@
 import os
 import time
 import json
+import shutil
+import hashlib
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
@@ -38,6 +40,37 @@ def nomFichier(nom_zone, code_dep=None):
     """
     nom = "".join(c for c in nom_zone.replace(" ", "_") if c not in ',/:*?"<>|\\')
     return f"{nom}{code_dep or ''}"
+
+
+def dossierTravail(nom_fichier, polygone, on_log=print):
+    """
+    Dossier des dalles calculees de la zone (config.DIR_EN_COURS), vide s'il vient d'une zone ou
+    de reglages differents.
+    --------
+    @param[in] nom_fichier : nom de la zone (voir nomFichier)
+    @param[in] polygone    : emprise de la zone (shapely, WGS84)
+    @param[in] on_log      : callback (message)
+
+    @return chemin du dossier
+    """
+    dossier = os.path.join(config.DIR_EN_COURS, nom_fichier)
+    chemin = os.path.join(dossier, "etat.json")
+    etat = {"zone": hashlib.sha1(polygone.wkb).hexdigest(),
+            "parametres": {k: v for k, v in config.snapshot().items()
+                           if k not in config.SANS_EFFET_DALLE}}
+    if os.path.isdir(dossier):
+        try:
+            with open(chemin, encoding="utf-8") as f:
+                meme = json.load(f) == etat
+        except (OSError, ValueError):
+            meme = False
+        if not meme:
+            on_log("dalles du calcul precedent ecartees : zone ou reglages differents")
+            shutil.rmtree(dossier)
+    os.makedirs(dossier, exist_ok=True)
+    with open(chemin, "w", encoding="utf-8") as f:
+        json.dump(etat, f, ensure_ascii=False)
+    return dossier
 
 
 def traiterDalle(mns_path, mnt_path, gdf, relief=None, temps=None):
@@ -99,6 +132,8 @@ def traiterDalle(mns_path, mnt_path, gdf, relief=None, temps=None):
 def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print):
     """
     Traite la zone : dalles, calcul parallele, fusion, filtre, protections, ecriture du gpkg.
+    Les dalles finies sont ecrites dans config.DIR_EN_COURS ; un calcul interrompu reprend aux
+    dalles manquantes.
     --------
     @param[in] echelle, nom_zone, code_dep : definition de la zone (voir zone)
     @param[in] on_progress : callback (i, total) a chaque dalle finie (None = aucun)
@@ -143,26 +178,32 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
     taches = [t + (relief,) for t in taches]
 
     total = len(taches)
-    resultats  = []
+    dossier = dossierTravail(nom_fichier, polygone, on_log)
+    chemins = [os.path.join(dossier, f"{t[2]}.pkl") for t in taches]
+    a_faire = [t for t, c in zip(taches, chemins) if not os.path.exists(c)]
+    faites = total - len(a_faire)
     temps_tous = []
     echecs     = []
-
-    on_log(f"{total} dalles a traiter")
+    on_log(f"{total} dalles a traiter" + (f", {faites} deja calculees" if faites else ""))
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=config.N_COEURS,
                              initializer=numba.set_num_threads, initargs=(1,)) as ex:
-        for i, (out, temps) in enumerate(ex.map(traiterTache, taches), 1):
+        for i, (out, temps) in enumerate(ex.map(traiterTache, a_faire), 1):
             if out is None:
-                echecs.append({"nom": temps.get("nom", "?"), "erreur": temps.get("erreur", "")})
-                on_log(f"echec dalle {temps.get('nom','?')}")
-            elif not out.empty:
-                resultats.append(out)
+                echecs.append({"nom": temps["nom"], "erreur": temps.get("erreur", "")})
+                on_log(f"echec dalle {temps['nom']}")
+            else:
+                chemin = os.path.join(dossier, f"{temps['nom']}.pkl")
+                out.to_pickle(chemin + ".tmp")
+                os.replace(chemin + ".tmp", chemin)
                 temps_tous.append(temps)
             if on_progress is not None:
-                on_progress(i, total)
+                on_progress(faites + i, total)
     t_traitement = time.time() - t0
 
+    resultats = [r for r in (pd.read_pickle(c) for c in chemins if os.path.exists(c))
+                 if not r.empty]
     if not resultats:
         on_log("aucun batiment traite")
         return {"fichier": None, "total": total, "echecs": echecs}
@@ -192,6 +233,7 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
         "date_creation": datetime.now().isoformat(timespec="seconds"),
     }
     g.to_file(gpkg_path, driver="GPKG", layer="batiments", dataset_metadata=metadonnees)
+    shutil.rmtree(dossier, ignore_errors=True)
     t_ecriture = time.time() - t0
 
     def moyenne(cle):

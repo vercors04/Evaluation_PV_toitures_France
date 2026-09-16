@@ -39,6 +39,7 @@ def agregerBatiment(df, gdf, hauteur):
         "surf_m2_plat":        plat.groupby("id").surf.sum(),
         "surf_m2_seuil":       seuil.groupby("id").surf.sum(),
         "pente_moy_deg_incl":  inc.groupby("id").pente.mean(),
+        "ciel_moy":            df.groupby("id").ciel.mean(),
         "nb_pixels":           df.groupby("id").size(),
     })
     for s, nom in enumerate(config.SECTEURS):
@@ -67,7 +68,7 @@ def agregerBatiment(df, gdf, hauteur):
               "surf_m2_incl", "surf_m2_or", "surf_m2_seuil", "surf_m2_mod",
               "pente_moy_deg_incl"]
              + [f"surf_m2_incl_{s}" for s in config.SECTEURS]
-             + ["irr_an_kwh", "puissance_kwc", "prod_an_kwh",
+             + ["ciel_moy", "irr_an_kwh", "puissance_kwc", "prod_an_kwh",
                 "irr_an_kwh_orp", "puissance_kwc_orp", "prod_an_kwh_orp",
                 "irr_an_kwh_seuil", "puissance_kwc_seuil", "prod_an_kwh_seuil"]
              + [f"prod_T{t}_kwh_orp" for t in range(1, 5)]
@@ -78,7 +79,8 @@ def agregerBatiment(df, gdf, hauteur):
 def mergeCleabs(gdf):
     """
     Recolle les morceaux d'un meme batiment a cheval sur plusieurs dalles (meme cleabs) :
-    somme les grandeurs additives, moyenne ponderee de la pente, garde la hauteur max.
+    somme les grandeurs additives, moyennes ponderees de la pente et du ciel, garde la hauteur
+    max.
     --------
     @param[in] gdf : sortie de agregerBatiment (plusieurs lignes possibles par cleabs)
 
@@ -86,11 +88,14 @@ def mergeCleabs(gdf):
     """
     gdf = gdf.copy()
     gdf["_pente_pond"] = gdf.pente_moy_deg_incl * gdf.surf_m2_incl
+    gdf["_ciel_pond"]  = gdf.ciel_moy * gdf.nb_pixels
     agg = {c: "sum" for c in gdf.columns
-           if c.startswith(("surf_", "irr_", "prod_", "puissance_")) or c in ("nb_pixels", "_pente_pond")}
+           if c.startswith(("surf_", "irr_", "prod_", "puissance_"))
+           or c in ("nb_pixels", "_pente_pond", "_ciel_pond")}
     agg.update({a: "first" for a in config.ATTRS_BATI})
     agg.update(hauteur_p95_m="max", geometry="first", pose_plat="max")
     out = gdf.groupby("cleabs", as_index=False).agg(agg)
     out["pente_moy_deg_incl"] = (out._pente_pond / out.surf_m2_incl).fillna(0.0)
-    out = out.drop(columns="_pente_pond")
+    out["ciel_moy"] = out._ciel_pond / out.nb_pixels
+    out = out.drop(columns=["_pente_pond", "_ciel_pond"])
     return gpd.GeoDataFrame(out, geometry="geometry", crs=gdf.crs)

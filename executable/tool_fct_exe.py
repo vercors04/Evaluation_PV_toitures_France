@@ -15,7 +15,7 @@ def formater(valeur, unite):
     Formate une valeur avec un prefixe adapte (k, M, G, T, P pour Wh/Wc, km2 pour m2).
     --------
     @param[in] valeur : valeur numerique (NaN tolere)
-    @param[in] unite  : "Wh", "Wc", "m2", "m", "deg" ou ""
+    @param[in] unite  : "Wh", "Wc", "m2", "m", "deg", "ratio" ou ""
 
     @return chaine affichable ("-" si NaN)
     """
@@ -28,6 +28,8 @@ def formater(valeur, unite):
         return f"{valeur:.2f} k{unite}"
     if unite == "m2" and abs(valeur) >= 1e6:
         return f"{valeur / 1e6:.2f} km2"
+    if unite == "ratio":
+        return f"{valeur:.2f}"
     if unite == "":
         return f"{valeur:,.0f}".replace(",", " ")
     return f"{valeur:,.1f} {unite}".replace(",", " ")
@@ -237,7 +239,7 @@ def statsRapide(parent_selec, gpkg_dir, parent_stats):
                          f"moyenne={formater(col.mean(), unite)}  "
                          f"P10–P90={formater(col.quantile(0.10), unite)} à "
                          f"{formater(col.quantile(0.90), unite)}")
-                if unite not in ("m", "deg"):
+                if unite not in config.SANS_TOTAL:
                     texte = f"total={formater(col.sum(), unite)}  " + texte
                 lignes.append(f"{libelle:<30}: {texte}")
             resultat = "\n\n".join(lignes)

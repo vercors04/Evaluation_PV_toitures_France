@@ -242,7 +242,7 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat, utile,
                             None = config.PLAT_POSE partout
 
     @return DataFrame, 1 ligne par pixel (id, energie, energie_eff, energie_eff_T1..T4, surf,
-            surf_mod, pente, secteur, incline, incline_or, pose)
+            surf_mod, pente, ciel, secteur, incline, incline_or, pose)
     """
     toit = incline | plat
     assert horizon.shape[0] == toit.sum(), "horizon et masque de toit desynchronises"
@@ -339,6 +339,7 @@ def irrPixels(masque_bat, pente, aspect, incline, incline_or, plat, utile,
         "surf":        surf,
         "surf_mod":    surf_mod,
         "pente":       p,
+        "ciel":        fc_toit,
         "secteur":     np.round(a / 45).astype(int) % 8,
         "incline":     incline[toit],
         "incline_or":  incline_or[toit],

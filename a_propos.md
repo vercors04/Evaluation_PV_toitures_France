@@ -103,6 +103,15 @@ tient compte :
     - d'un performance ratio résiduel, qui ne couvre plus que ce qui n'est
       pas modélisé (câblage, onduleur, salissures, désadaptation)
 
+------
+CALCUL
+------
+
+Les dalles d'une zone se calculent en parallèle. Chaque dalle finie est écrite
+dans data/processed/en_cours/<zone>/ ; un calcul interrompu reprend aux dalles
+manquantes, tant que la zone et les réglages du calcul n'ont pas changé. Le
+dossier est supprimé une fois le gpkg écrit.
+
 ----------
 EXECUTABLE
 ----------
@@ -160,6 +169,10 @@ pente_moy_deg_incl
 surf_m2_incl_N ... surf_m2_incl_NO
     Surface inclinée par orientation (8 secteurs)
 
+ciel_moy
+    Part du ciel vue par le toit, en moyenne sur ses pixels (0 à 1, 1 = dégagé) ;
+    horizon des bâtiments et du relief compris
+
 irr_an_kwh
     Irradiation reçue par an — toute la toiture
 
@@ -198,9 +211,9 @@ Toute colonne de résultat suit le même schéma :
 
     <grandeur>[_<qualificateur>]_<unité>[_<périmètre>]
 
-grandeur        surf, irr, prod, puissance, pente, hauteur, nb_pixels
+grandeur        surf, irr, prod, puissance, pente, hauteur, ciel, nb_pixels
 qualificateur   temporel (an, T1..T4) ou statistique (moy, p95) ; absent si sans objet
-unité           m2, kwh, kwc, deg, m ; absente pour un simple comptage (nb_pixels)
+unité           m2, kwh, kwc, deg, m ; absente pour un comptage (nb_pixels) ou un rapport (ciel_moy)
 périmètre       TOUJOURS en dernier ; absent = toute la toiture
 
 Valeurs du périmètre :

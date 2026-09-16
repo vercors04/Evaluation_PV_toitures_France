@@ -7,7 +7,7 @@ build/
 dist/
 data/
 statistiques/
-src/debug/comparaisons/batiments.csv
+src/debug/
 
 00_rapport/
 00_stats_rapport/

@@ -569,8 +569,8 @@ if __name__ == "__main__":
               ).pack(pady=(25, 5))
 
     btn_dessin = bouton(btz, "Ouvrir la carte de traçage", lambda: lancerDessin(),
-                        aide="taille annoncée avant validation. Une zone tracée n'est pas "
-                             "découpée en sous-tâches : un échec oblige à tout refaire.")
+                        aide="taille annoncée avant validation. Un calcul interrompu reprend "
+                             "aux dalles manquantes.")
 
     bouton(btz, "Vider le cache", lambda: lancerViderCacheDessin(),
            aide="cache des résultats, pour ne pas relire les gpkg à chaque affichage.")

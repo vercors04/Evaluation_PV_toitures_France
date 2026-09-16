@@ -21,6 +21,7 @@ OUT_DIR_RAW       = os.path.join(BASE, "data", "raw")                   # dalles
 DIR_GEOJSON       = os.path.join(BASE, "data", "processed", "geojson")  # contours de zone (.geojson)
 DIR_RELIEF        = os.path.join(BASE, "data", "relief")                # MNT grossiers (horizon lointain)
 OUT_DIR_PROCESSED = os.path.join(BASE, "data", "processed", "gpkg")     # resultats (.gpkg)
+DIR_EN_COURS      = os.path.join(BASE, "data", "processed", "en_cours") # dalles calculees, reprise
 DOSSIER           = os.path.join(BASE_DATA, "data", "tables")           # tables meteo (.npz)
 DOSSIER_FIN       = os.path.join(DOSSIER, "fines")                      # sous-cellules (.npz)
 ECARTS_FIN        = os.path.join(DOSSIER_FIN, "ecarts.csv")             # ecarts mesures par sous-cellule
@@ -65,6 +66,7 @@ GROUPES_SORTIE = {
     "surf_m2_mod":         ["surf_m2_mod"],
     "pente_moy_deg_incl":  ["pente_moy_deg_incl"],
     "surfaces_orient":     [f"surf_m2_incl_{s}" for s in SECTEURS],
+    "ciel_moy":            ["ciel_moy"],
     "irr_an_kwh":          ["irr_an_kwh"],
     "puissance_kwc":       ["puissance_kwc"],
     "prod_an_kwh":         ["prod_an_kwh"],
@@ -89,6 +91,7 @@ COLONNES_SORTIE = {
     "surf_m2_mod":         ("Surface de modules installables", "m2"),
     **{f"surf_m2_incl_{s}": (f"Surface inclinée {s}", "m2") for s in SECTEURS},
     "pente_moy_deg_incl":  ("Pente moyenne des pans inclinés", "deg"),
+    "ciel_moy":            ("Part du ciel vue par le toit", "ratio"),
     "irr_an_kwh":          ("Irradiation reçue / an, toute la toiture", "Wh"),
     "irr_an_kwh_orp":      ("Irradiation reçue / an, base installable", "Wh"),
     "irr_an_kwh_seuil":    ("Irradiation reçue / an, au-dessus du seuil", "Wh"),
@@ -103,6 +106,7 @@ COLONNES_SORTIE = {
     "prod_T3_kwh_orp":     ("Production T3 (juil-sept)", "Wh"),
     "prod_T4_kwh_orp":     ("Production T4 (oct-déc)", "Wh"),
 }
+SANS_TOTAL = ("m", "deg", "ratio")                    # unites dont la somme n'a pas de sens
 
 # catalogues de choix de l'interface
 ATTRS_BDTOPO = ['nature', 'usage_1', 'usage_2', 'construction_legere',
@@ -134,6 +138,11 @@ POSES_PLAT      = ["à plat", "sud", "est-ouest"]
 CRITERES_MIXTE  = ["surface", "usage", "nature"]
 ESPACEMENTS_SUD = ["sans ombre au solstice", "taux fixé"]
 THERMIQUE_PLAT  = {"à plat": "integre", "sud": "libre", "est-ouest": "surimpose"}   # cles de POSES
+
+# reglages sans effet sur le calcul d'une dalle (modifiables avant une reprise)
+SANS_EFFET_DALLE = ["N_COEURS", "N_THREADS", "COUNT", "N_ESSAIS_WFS", "PAUSE_WFS", "N_ESSAIS",
+                    "PAUSE_DL", "N_ESSAIS_DEPARTEMENT", "PAUSE_DEPARTEMENT", "SORTIE_GARDEES",
+                    "PROTECTIONS_OK", "PROTECTIONS_EXCLURE"]
 
 # protections (L111-17 du code de l'urbanisme)
 # {libelle: (colonne, couche WFS, champ geometrique, filtre CQL, CRS de la BBOX)}

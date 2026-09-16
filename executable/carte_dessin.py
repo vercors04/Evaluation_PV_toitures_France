@@ -64,8 +64,8 @@ def avertissement(n_dalles, serre):
     fin = "Les dalles sans bâtiment sont sautées : le calcul sera plus court."
     if n_dalles >= SEUIL_GRAVE:
         return "grave", (f"{combien}, au plus {duree_txt}. Une zone tracée n'est pas découpée "
-                         "en sous-tâches : un échec oblige à tout refaire. Préférez "
-                         "plusieurs zones plus petites.")
+                         "en sous-tâches (un calcul interrompu reprend aux dalles manquantes). "
+                         "Préférez plusieurs zones plus petites.")
     if n_dalles >= SEUIL_ATTENTION:
         return "attention", f"{combien}, soit au plus {duree_txt} de calcul. {fin}"
     return "ok", f"{combien}, au plus {duree_txt}. {fin}"
@@ -172,7 +172,7 @@ def popupZone(nom, d):
     for c, (libelle, unite) in config.COLONNES_SORTIE.items():
         if c not in d["somme"] or d["n"] == 0:
             continue
-        total = formater(d["somme"][c], unite) if unite not in ("m", "deg") else "-"
+        total = formater(d["somme"][c], unite) if unite not in config.SANS_TOTAL else "-"
         moy = formater(d["somme"][c] / d["n"], unite)
         med = formater(d["med"][c], unite)
         interv = f'{formater(d["p10"][c], unite)} à {formater(d["p90"][c], unite)}'
