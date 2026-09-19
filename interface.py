@@ -369,7 +369,7 @@ if __name__ == "__main__":
     mnh_min     = champ2(g_geom, "Hauteur min au-dessus du sol (m)", config.MNH_MIN,
                                 aide="en dessous, le pixel n'est pas du toit.")
     res_mnt_m   = champ2(g_geom, "Pas du MNT téléchargé (m)", config.RES_MNT_M,
-                                aide="sert à la hauteur au-dessus du sol. 0,5 en relief marqué.")
+                                aide="sert à la hauteur au-dessus du sol.")
     methode_pente = listeDeroulante(g_geom, "Méthode pente/orientation", ["plan", "differences"],
                                 config.METHODE_PENTE,
                                 aide="« plan » : moindres carrés, moins bruité. « differences » : méthode du "
