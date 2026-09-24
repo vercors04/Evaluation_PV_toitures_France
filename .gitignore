@@ -7,7 +7,7 @@ build/
 dist/
 data/
 statistiques/
-src/debug/
+src/verif/
 
 00_rapport/
 00_stats_rapport/

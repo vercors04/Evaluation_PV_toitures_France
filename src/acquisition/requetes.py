@@ -33,10 +33,10 @@ def lireWFS(params):
     err = ""
     for essai in range(1, n + 1):
         try:
-            txt = session().get(config.WFS, params=params, timeout=120).text
-            if "FeatureCollection" in txt[:300]:
-                return gpd.read_file(txt)
-            err = txt[:200]
+            contenu = session().get(config.WFS, params=params, timeout=120).content
+            if b"FeatureCollection" in contenu[:300]:
+                return gpd.read_file(contenu)
+            err = contenu[:200].decode("utf-8", "replace")
         except Exception as e:
             err = str(e)
         if essai < n:

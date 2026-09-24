@@ -21,6 +21,7 @@ OUT_DIR_RAW       = os.path.join(BASE, "data", "raw")                   # dalles
 DIR_GEOJSON       = os.path.join(BASE, "data", "processed", "geojson")  # contours de zone (.geojson)
 DIR_RELIEF        = os.path.join(BASE, "data", "relief")                # MNT grossiers (horizon lointain)
 OUT_DIR_PROCESSED = os.path.join(BASE, "data", "processed", "gpkg")     # resultats (.gpkg)
+DIR_CARTES        = os.path.join(BASE, "data", "processed", "cartes")   # cartes .html et leurs caches
 DIR_EN_COURS      = os.path.join(BASE, "data", "processed", "en_cours") # dalles calculees, reprise
 DOSSIER           = os.path.join(BASE_DATA, "data", "tables")           # tables meteo (.npz)
 DOSSIER_FIN       = os.path.join(DOSSIER, "fines")                      # sous-cellules (.npz)
@@ -233,14 +234,17 @@ def snapshot():
 
 def derive():
     """
-    Recalcule les reglages derives : coefficients du preset de pose, filtres BD TOPO.
+    Recalcule les reglages derives : coefficients du preset de pose, bornes de pente, filtres
+    BD TOPO.
     --------
     @return None
     """
-    global FILTRES_BATI, U0_FAIMAN, U1_FAIMAN
+    global FILTRES_BATI, U0_FAIMAN, U1_FAIMAN, PENTE_MAX, PENTE_PLAT
     preset = POSES.get(POSE)
     if preset is not None:
         U0_FAIMAN, U1_FAIMAN = preset
+    PENTE_MAX  = min(PENTE_MAX, float(BETAS[-1]))     # au-dela, hors grille des tables
+    PENTE_PLAT = min(PENTE_PLAT, PENTE_MAX)
     FILTRES_BATI = {
         "etat_de_l_objet": ETAT,
         "nature":          NATURE_OK,

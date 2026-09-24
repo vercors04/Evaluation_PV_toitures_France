@@ -13,10 +13,10 @@ from src import config
 from executable.tool_fct_exe import formater, echelleGpkg
 from executable.carte_style import CSS, TRAIT, REMPLI, OPACITE, OPACITE_SURVOL, fondsDeCarte
 
-FICHIER_STATS = os.path.join(config.BASE, "data", "processed", "stats_polygones.json")
-FICHIER_CARTE = os.path.join(config.BASE, "data", "processed", "carte_dessin.html")
-FICHIER_TRACE = os.path.join(config.BASE, "data", "processed", "dernier_trace.json")
-FICHIER_LISTE = os.path.join(config.BASE, "data", "processed", "zones_tracees.json")
+FICHIER_STATS = os.path.join(config.DIR_CARTES, "stats_polygones.json")
+FICHIER_CARTE = os.path.join(config.DIR_CARTES, "carte_dessin.html")
+FICHIER_TRACE = os.path.join(config.DIR_CARTES, "dernier_trace.json")
+FICHIER_LISTE = os.path.join(config.DIR_CARTES, "zones_tracees.json")
 
 COTE_DALLE = 1000.0
 MAX_CASES  = 40000

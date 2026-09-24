@@ -145,6 +145,9 @@ nb_pixels
 
 surf_m2
     Surface de toit exploitable (plat + incliné)
+    Surface posable, non surface de toiture : les faces au-delà de la pente max
+    et le pourtour des obstacles en sont exclus. Un inventaire de pans, comme
+    ceux des cadastres solaires, mesure la seconde et rend donc davantage.
 
 surf_m2_plat
     Surface plate

@@ -43,7 +43,8 @@ if __name__ == "__main__":
                        aide="degrés, 0 = Nord, 90 = Est. Arc parcouru en sens horaire jusqu'au max.")
     az_max     = champ(bpg, "Azimut max", config.AZ_MAX, aide="degrés, 0 = Nord, 90 = Est.")
     pente_plat = champ(bpg, "Pente plat (deg)", config.PENTE_PLAT, aide="en dessous, le toit est plat")
-    pente_max  = champ(bpg, "Pente max (deg)", config.PENTE_MAX, aide="70 au plus")
+    pente_max  = champ(bpg, "Pente max (deg)", config.PENTE_MAX,
+                       aide="au-delà, le pixel est écarté. 70 au plus, ramené sinon.")
     seuil_irradiance = champ(bpg, "Seuil irradiance", config.SEUIL_IRRADIANCE,
                              aide="kWh/m²/an reçus, ombrage compris, pour les sorties « seuil »")
 

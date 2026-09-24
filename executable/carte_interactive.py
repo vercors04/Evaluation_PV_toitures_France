@@ -12,8 +12,8 @@ from executable.carte_style import CSS, REMPLI, OPACITE, OPACITE_SURVOL, fondsDe
 
 
 DIR_CONTOURS  = os.path.join(config.BASE_DATA, "data", "contours")
-FICHIER_STATS = os.path.join(config.BASE, "data", "processed", "stats_carte.json")
-FICHIER_CARTE = os.path.join(config.BASE, "data", "processed", "carte.html")
+FICHIER_STATS = os.path.join(config.DIR_CARTES, "stats_carte.json")
+FICHIER_CARTE = os.path.join(config.DIR_CARTES, "carte.html")
 
 REGIONS = ["auvergne-rhone-alpes", "bourgogne-franche-comte", "bretagne",
            "centre-val-de-loire", "corse", "grand-est", "hauts-de-france",

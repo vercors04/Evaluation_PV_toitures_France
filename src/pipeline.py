@@ -132,8 +132,8 @@ def traiterDalle(mns_path, mnt_path, gdf, relief=None, temps=None):
 def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print):
     """
     Traite la zone : dalles, calcul parallele, fusion, filtre, protections, ecriture du gpkg.
-    Les dalles finies sont ecrites dans config.DIR_EN_COURS ; un calcul interrompu reprend aux
-    dalles manquantes.
+    Les dalles finies sont ecrites dans config.DIR_EN_COURS et effacees a la fin ; gardees si
+    une dalle a echoue, un calcul relance reprend alors aux dalles manquantes.
     --------
     @param[in] echelle, nom_zone, code_dep : definition de la zone (voir zone)
     @param[in] on_progress : callback (i, total) a chaque dalle finie (None = aucun)
@@ -159,7 +159,9 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
 
     nom_fichier = nomFichier(nom_zone, code_dep)
     zone_l93 = gpd.GeoDataFrame(geometry=[polygone], crs=4326).to_crs(2154)
-    zone_l93.to_file(os.path.join(config.DIR_GEOJSON, f"{nom_fichier}.geojson"), driver="GeoJSON")
+    if echelle != "polygone":
+        zone_l93.to_file(os.path.join(config.DIR_GEOJSON, f"{nom_fichier}.geojson"),
+                         driver="GeoJSON")
     gpkg_path = os.path.join(config.OUT_DIR_PROCESSED, f"{nom_fichier}.gpkg")
 
     taches = []
@@ -229,11 +231,17 @@ def runPipeline(echelle, nom_zone, code_dep=None, on_progress=None, on_log=print
                                     ensure_ascii=False),
         "batiments":     json.dumps({"avant_merge_filtre": n_avant, "apres_merge": n_merge,
                                      "apres_filtre": n_filtre, "final": len(g)}, ensure_ascii=False),
+        "dalles":        json.dumps({"total": total, "calculees": total - len(echecs),
+                                     "echecs": echecs}, ensure_ascii=False),
         "protections":   json.dumps(protections, ensure_ascii=False),
         "date_creation": datetime.now().isoformat(timespec="seconds"),
     }
     g.to_file(gpkg_path, driver="GPKG", layer="batiments", dataset_metadata=metadonnees)
-    shutil.rmtree(dossier, ignore_errors=True)
+    if echecs:
+        on_log(f"{len(echecs)} dalle(s) en echec : les dalles calculees sont gardees, "
+               f"relancer la zone ne refera que les manquantes")
+    else:
+        shutil.rmtree(dossier, ignore_errors=True)
     t_ecriture = time.time() - t0
 
     def moyenne(cle):
