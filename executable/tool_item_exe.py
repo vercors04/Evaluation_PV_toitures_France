@@ -213,7 +213,7 @@ def case(parent, libelle, defaut, aide=None):
     """
     ligne = ttk.Frame(parent); ligne.pack(fill="x", pady=2)
     var = tk.BooleanVar(value=defaut)
-    ttk.Checkbutton(ligne, text=libelle, variable=var).pack(anchor="w", pady=2)
+    ttk.Checkbutton(ligne, text=libelle, variable=var).pack(side="left", pady=2)
     if aide:
         bulleAide(ligne, aide)
     return var
